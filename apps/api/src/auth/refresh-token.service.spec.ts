@@ -9,13 +9,22 @@ function sha256(value: string): string {
 }
 
 function buildPrismaMock() {
+  const tx = {
+    refreshToken: {
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+  };
+
   return {
+    tx,
     refreshToken: {
       create: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
     },
+    $transaction: vi.fn(async (cb: (txArg: typeof tx) => unknown) => cb(tx)),
   };
 }
 
@@ -84,15 +93,42 @@ describe("RefreshTokenService", () => {
         expiresAt: new Date(Date.now() + 1000),
       });
 
+      prisma.tx.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+
       const result = await service.rotate("valid-token");
 
-      expect(prisma.refreshToken.update).toHaveBeenCalledWith({
-        where: { id: "rt-1" },
+      // Claim (revoke only if still unrevoked) and issue the replacement in
+      // one transaction, so a concurrent loser can't revoke-all in between.
+      expect(prisma.$transaction).toHaveBeenCalledOnce();
+      expect(prisma.tx.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { id: "rt-1", revokedAt: null },
         data: { revokedAt: expect.any(Date) },
       });
-      expect(prisma.refreshToken.create).toHaveBeenCalledOnce();
+      expect(prisma.tx.refreshToken.create).toHaveBeenCalledOnce();
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
       expect(result.userId).toBe("user-1");
       expect(result.token).not.toBe("valid-token");
+    });
+
+    it("treats losing a concurrent rotation of the same token as reuse", async () => {
+      // Both requests read the token as unrevoked; this one's claim then
+      // matches no row because the winner revoked it first.
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        id: "rt-1",
+        userId: "user-1",
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 1000),
+      });
+      prisma.tx.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.rotate("raced-token")).rejects.toThrow("already been used");
+
+      expect(prisma.tx.refreshToken.create).not.toHaveBeenCalled();
+      // Outside the (rolled-back) transaction, so it isn't undone.
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: "user-1", revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
     });
 
     it("revokes every token for the user when a rotated-out (revoked) token is reused", async () => {

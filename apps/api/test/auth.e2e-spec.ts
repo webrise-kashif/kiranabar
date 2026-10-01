@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { HttpExceptionFilter } from "../src/common/filters/http-exception.filter";
 import { ResponseEnvelopeInterceptor } from "../src/common/interceptors/response-envelope.interceptor";
+import { RefreshTokenService } from "../src/auth/refresh-token.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { ZodValidationPipe } from "nestjs-zod";
 
@@ -233,6 +234,28 @@ describe("Auth (e2e)", () => {
         .set("Cookie", secondCookies)
         .send({})
         .expect(401);
+    });
+
+    it("rotates a token exactly once under truly concurrent rotations (real database locking)", async () => {
+      // Called directly rather than over HTTP: HTTP requests arrive staggered
+      // enough that a sub-millisecond rotation never overlaps another, while
+      // these all issue their reads in the same tick.
+      const refreshTokens = app.get(RefreshTokenService);
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: customerEmail } });
+      // Isolate from sessions earlier tests left behind.
+      await refreshTokens.revokeAllForUser(user.id);
+      const { token } = await refreshTokens.issue(user.id);
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 10 }, () => refreshTokens.rotate(token)),
+      );
+
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      // The losers count as reuse, so no token for this user survives --
+      // including the replacement the winner was just issued.
+      expect(await prisma.refreshToken.count({ where: { userId: user.id, revokedAt: null } })).toBe(
+        0,
+      );
     });
 
     it("rejects a missing refresh token", async () => {

@@ -184,6 +184,13 @@ regression guard.
 | Admin UI behavior                             | `apps/admin/src/**/Component.test.tsx`, next to the component     |
 | Store UI / composable behavior                | `apps/store/app/**/*.test.ts`                                     |
 
+**Reproducing a race:** fire the operations concurrently in-process
+(`Promise.all` over the service from `app.get(SomeService)` in an e2e spec).
+Concurrent supertest requests arrive staggered enough that a fast operation
+(a few sub-millisecond queries) never overlaps another, so an HTTP-level race
+test can pass against buggy code. If it can't be made to fail reliably,
+reproduce the interleaving deterministically in a unit spec with mocks.
+
 A new endpoint usually takes both: an e2e test for the contract (status codes,
 `{ data }`/`{ error }` shape, `401`/`403`), then service specs driving out the
 rules behind it.

@@ -97,6 +97,18 @@ Attacker calls /auth/refresh with A (already revoked)
   → both parties must log in again; only the real credential holder can
 ```
 
+**Concurrent use of the same token** is resolved in the database, not by
+the initial read: the rotation claims the token with a conditional update
+(`revokedAt IS NULL`) and issues its replacement **in one transaction**.
+Of several concurrent refreshes presenting the same token, exactly one
+wins. Each loser waits on the row lock until the winner commits, matches
+no row, and is treated as **reuse**: `401`, and every token the user has
+is revoked, including the winner's just-issued replacement. This is
+deliberately the same strict response as a reuse that arrives a moment
+later; it means a client that fires two refreshes at the same instant
+(e.g. two browser tabs) will be logged out everywhere. Without the guard,
+N concurrent refreshes turned one token into N valid sessions.
+
 ### Transport, per client
 
 Decided by an `X-Client-Platform: web | mobile` request header, defaulting
