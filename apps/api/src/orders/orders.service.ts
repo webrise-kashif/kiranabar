@@ -207,10 +207,28 @@ export class OrdersService {
     }
 
     if (order.status !== "PLACED") {
-      throw new ForbiddenException("Only an order that hasn't been paid yet can be cancelled");
+      throw new NotCancellableException();
     }
 
     const cancelled = await this.prisma.$transaction(async (tx) => {
+      // The status check above is only a fast path -- the real guard is
+      // this conditional update. It runs first so it takes the order row's
+      // lock: of two concurrent cancels, the second waits, then matches no
+      // row (status is no longer PLACED) and throws P2025 before restoring
+      // any stock, so stock is restored exactly once.
+      const updated = await tx.order
+        .update({
+          where: { id: orderId, status: "PLACED" },
+          data: { status: "CANCELLED" },
+          include: ORDER_INCLUDE,
+        })
+        .catch((error: unknown) => {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+            throw new NotCancellableException();
+          }
+          throw error;
+        });
+
       // No version guard needed here -- unlike a decrement, restoring
       // stock is commutative: it's always safe to apply regardless of
       // what else has happened to the row in the meantime.
@@ -221,11 +239,7 @@ export class OrdersService {
         });
       }
 
-      return tx.order.update({
-        where: { id: orderId },
-        data: { status: "CANCELLED" },
-        include: ORDER_INCLUDE,
-      });
+      return updated;
     });
 
     return toOrder(cancelled);
@@ -262,6 +276,12 @@ export class OrdersService {
     });
 
     return toOrder(updated);
+  }
+}
+
+class NotCancellableException extends ForbiddenException {
+  constructor() {
+    super("Only an order that hasn't been paid yet can be cancelled");
   }
 }
 

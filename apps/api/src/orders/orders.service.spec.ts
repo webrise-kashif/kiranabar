@@ -390,6 +390,23 @@ describe("OrdersService", () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
+    it("rejects without restocking when a concurrent request already moved the order off PLACED", async () => {
+      // Read as PLACED, but by the time the conditional update runs, another
+      // request has cancelled (or paid) it, so the update matches no row.
+      prisma.order.findUnique.mockResolvedValue(buildOrderRow());
+      prisma.tx.order.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("No record was found for an update.", {
+          code: "P2025",
+          clientVersion: "test",
+        }),
+      );
+
+      await expect(service.cancelMyOrder("user-1", "order-1")).rejects.toThrow(
+        /hasn't been paid yet/,
+      );
+      expect(prisma.tx.inventory.updateMany).not.toHaveBeenCalled();
+    });
+
     it("cancels a PLACED order and restores stock", async () => {
       prisma.order.findUnique.mockResolvedValue(buildOrderRow());
       prisma.tx.order.update.mockResolvedValue(buildOrderRow({ status: "CANCELLED" }));
@@ -401,7 +418,10 @@ describe("OrdersService", () => {
         data: { quantityAvailable: { increment: 2 }, version: { increment: 1 } },
       });
       expect(prisma.tx.order.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: "order-1" }, data: { status: "CANCELLED" } }),
+        expect.objectContaining({
+          where: { id: "order-1", status: "PLACED" },
+          data: { status: "CANCELLED" },
+        }),
       );
       expect(result.status).toBe("CANCELLED");
     });

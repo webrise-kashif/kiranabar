@@ -378,6 +378,13 @@ pending a provider decision, per `docs/requirements.md`'s build order.
   and safe to apply no matter what else has happened to the row in the
   meantime, whereas a decrement is exactly the "two concurrent writers
   racing" case optimistic concurrency exists to protect against.
+  What _does_ need guarding is that the restock happens **once**: the
+  transaction first moves the order to `CANCELLED` with a conditional
+  update (`where: { id, status: "PLACED" }`), which takes the order row's
+  lock. A concurrent second cancel waits on that lock, then matches no row
+  and gets `403` before restoring anything. (The pre-transaction status
+  check is only a fast path; on its own it let concurrent cancels each
+  restore the stock.)
 - **Cancellation is customer self-service, and only from `PLACED`.**
   `PATCH /api/v1/orders/:id/cancel` is rejected with `403` once an order
   has moved to `PAID` or beyond — cancelling after payment is a refund
