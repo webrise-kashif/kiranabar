@@ -135,6 +135,13 @@ Vitest everywhere, plus the library that fits each surface:
     PostgreSQL (`docker compose up -d`) because bootstrapping connects
     `PrismaService` — though note the connection is lazy (via the driver adapter),
     so endpoints that never query the database will pass even without one.
+    The database must also be migrated and **seeded**
+    (`pnpm --filter @kiranabar/api prisma:seed`) — several specs log in as the
+    seeded users (e.g. `admin@example.com`).
+- **CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every
+  pull request: format check, lint, typecheck, unit tests, and build in one
+  job; API e2e tests against a PostgreSQL service container (migrated and
+  seeded) in another. Both must be green before merging.
 - **`apps/admin`**: Vitest + `@testing-library/react` + `jsdom`. Query by role/text,
   not by test id, unless there's no accessible alternative.
 - **`apps/store`**: Vitest with `@nuxt/test-utils`'s `nuxt` environment (needed for

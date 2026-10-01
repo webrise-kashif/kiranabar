@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch/PR supersedes an in-progress run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Test-only values, never real credentials. They match the postgres service
+# below and satisfy apps/api/src/config/env.schema.ts (secrets >= 32 chars).
+# Unit tests need them too: app.module.spec.ts validates the environment
+# eagerly, and prisma.config.ts requires DATABASE_URL for `prisma generate`.
+env:
+  DATABASE_URL: postgresql://kiranabar:kiranabar@localhost:5432/kiranabar?schema=public
+  AUTH_JWT_ACCESS_SECRET: ci-only-access-secret-not-for-production-use
+  AUTH_JWT_REFRESH_SECRET: ci-only-refresh-secret-not-for-production-use
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  checks:
+    name: Format, lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      # Version comes from package.json's "packageManager" field.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @kiranabar/api prisma:generate
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  e2e:
+    name: API e2e tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kiranabar
+          POSTGRES_PASSWORD: kiranabar
+          POSTGRES_DB: kiranabar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kiranabar"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @kiranabar/api prisma:generate
+      - run: pnpm --filter @kiranabar/api exec prisma migrate deploy
+      # e2e specs log in as the seeded users (e.g. admin@example.com).
+      - run: pnpm --filter @kiranabar/api prisma:seed
+      # The shared packages resolve to dist/, so build the API's workspace
+      # dependencies before running its tests directly (outside Turborepo).
+      - run: pnpm exec turbo run build --filter="@kiranabar/api^..."
+      - run: pnpm --filter @kiranabar/api test:e2e
