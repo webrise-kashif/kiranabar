@@ -2,6 +2,7 @@
   "name": "kiranabar-platform",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "packageManager": "pnpm@9.15.9",
   "engines": {
     "node": "^20.19 || ^22.12 || >=24.0"
