@@ -1,0 +1,35 @@
+{
+  "name": "@kiranabar/config",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/node.json": "./tsconfig/node.json",
+    "./tsconfig/react.json": "./tsconfig/react.json",
+    "./eslint/base": "./eslint/base.mjs",
+    "./eslint/node": "./eslint/node.mjs",
+    "./eslint/vue": "./eslint/vue.mjs",
+    "./eslint/react": "./eslint/react.mjs",
+    "./prettier": "./prettier.mjs",
+    "./vitest/node": "./vitest/node.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "echo 'no typecheck for config package'"
+  },
+  "dependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.5",
+    "eslint-plugin-vue": "10.10.0",
+    "typescript-eslint": "catalog:",
+    "vue-eslint-parser": "10.4.1"
+  },
+  "devDependencies": {
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

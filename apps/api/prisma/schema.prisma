@@ -1,0 +1,401 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------
+
+/// A user's single role. Modeled as an enum -- not a join table -- because
+/// the role set is small, fixed, and mutually exclusive today. See
+/// docs/database.md for how this evolves into a full permission model
+/// later without breaking existing data.
+enum Role {
+  CUSTOMER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CategoryStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+/// placed -> paid -> shipped -> delivered, or placed/paid -> cancelled.
+/// See docs/orders.md for the full transition rules and who may apply them.
+enum OrderStatus {
+  PLACED
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+// -----------------------------------------------------------------------
+// Models
+// -----------------------------------------------------------------------
+
+/// Deliberately minimal -- still no profile fields (name, address, etc.),
+/// which belong to whichever feature first needs them. `passwordHash` is
+/// the one auth field required now that AuthModule is implemented; see
+/// docs/authentication.md.
+model User {
+  id           String @id @default(uuid(7))
+  email        String @unique
+  passwordHash String @map("password_hash")
+  role         Role   @default(CUSTOMER)
+
+  refreshTokens RefreshToken[]
+  cart          Cart?
+  orders        Order[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([role])
+  @@map("users")
+}
+
+/// One row per issued refresh token. Never stores the raw token -- only a
+/// SHA-256 hash of it, since the token itself is already a high-entropy
+/// random value (not a low-entropy secret that needs slow password-style
+/// hashing). Rotated on every use; `revokedAt` set on rotation, logout, or
+/// reuse-detection. See docs/authentication.md for the full rotation and
+/// reuse-detection design.
+model RefreshToken {
+  id     String @id @default(uuid(7))
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+/// Self-referential for an optional one-level-or-deeper hierarchy
+/// (parent/children). See docs/database.md for why this was chosen over a
+/// flat structure or a separate closure table.
+model Category {
+  id          String         @id @default(uuid(7))
+  name        String
+  slug        String         @unique
+  description String?
+  status      CategoryStatus @default(DRAFT)
+
+  parentId String?    @map("parent_id")
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children Category[] @relation("CategoryHierarchy")
+
+  products Product[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([parentId])
+  @@index([status])
+  @@map("categories")
+}
+
+model Product {
+  id          String  @id @default(uuid(7))
+  name        String
+  slug        String  @unique
+  description String?
+  sku         String  @unique
+
+  /// Current list price. Orders (not yet implemented) must snapshot this
+  /// value at purchase time rather than reference it live -- see
+  /// docs/database.md's "Future order history and price snapshots".
+  price Decimal @db.Decimal(12, 2)
+
+  /// Optional discounted price; when set and lower than `price`, this is
+  /// the effective purchase price. Enforcing salePrice < price is an
+  /// application-layer invariant, not a database constraint.
+  salePrice Decimal? @map("sale_price") @db.Decimal(12, 2)
+
+  /// ISO 4217 currency code (e.g. "USD"). A plain column, not an enum, so
+  /// adding a currency doesn't require a migration.
+  currency String @default("USD") @db.VarChar(3)
+
+  status ProductStatus @default(DRAFT)
+
+  categoryId String?   @map("category_id")
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  images     ProductImage[]
+  inventory  Inventory?
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  variants   ProductVariant[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("products")
+}
+
+/// Optional, additive sub-resource of Product -- a product may have zero or
+/// more variants (color, size, etc.), each independently priced/stocked.
+/// Product itself keeps its own price/sku/status/inventory unchanged; this
+/// is not a repoint. See docs/database.md's "Product variants".
+model ProductVariant {
+  id String @id @default(uuid(7))
+
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku String @unique
+
+  price     Decimal  @db.Decimal(12, 2)
+  salePrice Decimal? @map("sale_price") @db.Decimal(12, 2)
+  currency  String   @default("USD") @db.VarChar(3)
+
+  /// e.g. {"color":"Red","size":"M"} -- plain JSON rather than a separate
+  /// ProductVariantOption table, per YAGNI (matches this schema's existing
+  /// preference for plain columns over speculative structure -- see
+  /// Product.description). Shape/keys validated by Zod, not the database.
+  attributes Json
+
+  /// Reuses Product's status enum/lifecycle -- a variant's visibility is a
+  /// sub-lifecycle of its product's, not an independently evolving concept.
+  status ProductStatus @default(ACTIVE)
+
+  images     ProductImage[]
+  inventory  Inventory?
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([productId])
+  @@index([status])
+  @@map("product_variants")
+}
+
+/// Stores a CDN/object-storage URL, never binary image data.
+model ProductImage {
+  id String @id @default(uuid(7))
+
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Set for a variant-specific photo; unset images are the product's
+  /// general gallery, shown as the fallback for any variant without its own.
+  variantId String?         @map("variant_id")
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  url     String
+  altText String? @map("alt_text")
+
+  /// Display order within a product's gallery, ascending.
+  position Int @default(0)
+
+  /// Not database-constrained to exactly one true per product -- enforced
+  /// at the service layer once ProductImage writes are implemented. See
+  /// docs/database.md.
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([productId, position])
+  @@index([variantId])
+  @@map("product_images")
+}
+
+/// Deliberately separate from Product so it can evolve independently.
+/// productId/variantId are both nullable and independently unique --
+/// exactly one is ever set, enforced at the application layer
+/// (InventoryService), the same mutually-exclusive-nullable-column pattern
+/// already used by Cart.userId/Cart.guestToken. See docs/database.md.
+model Inventory {
+  id String @id @default(uuid(7))
+
+  productId String?  @unique @map("product_id")
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String?         @unique @map("variant_id")
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  /// Units immediately purchasable.
+  quantityAvailable Int @default(0) @map("quantity_available")
+
+  /// Units held against an in-progress checkout/cart but not yet
+  /// confirmed as sold. Total physical stock = available + reserved.
+  quantityReserved Int @default(0) @map("quantity_reserved")
+
+  /// Optimistic-concurrency token, incremented on every update. A future
+  /// checkout reservation should update available/reserved with a
+  /// `WHERE version = $expected` guard and retry on conflict, instead of
+  /// racing another request and overselling. See docs/database.md.
+  version Int @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("inventories")
+}
+
+/// One cart per identity -- either a logged-in User or an anonymous guest,
+/// never both. Usable without an account (per docs/requirements.md);
+/// persisted for a logged-in customer. See docs/cart.md.
+model Cart {
+  id String @id @default(uuid(7))
+
+  userId String? @unique @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Identifies a guest's cart when there's no user -- an opaque random
+  /// token issued as a cookie, distinct from any auth/session token.
+  /// Exactly one of userId/guestToken is set; enforced at the application
+  /// layer (CartService), not the database -- see docs/cart.md.
+  guestToken String? @unique @map("guest_token")
+
+  items CartItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("carts")
+}
+
+model CartItem {
+  id     String @id @default(uuid(7))
+  cartId String @map("cart_id")
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Optional narrowing of productId to one specific variant -- unlike
+  /// Inventory's mutually-exclusive productId/variantId, productId here is
+  /// always set; variantId just pins which variant this line is for.
+  variantId String?         @map("variant_id")
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  /// No price stored here -- a cart reflects the product's (or variant's)
+  /// *current* price, computed at read time. Only a future Order snapshots
+  /// price at purchase time; see docs/database.md's "Future order history
+  /// and price snapshots".
+  quantity Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Fully dedups a variant-specific line (variantId set) at the DB level.
+  /// For the no-variant case (variantId null), Postgres never enforces
+  /// this constraint at all -- NULL is never equal to NULL, even within a
+  /// multi-column unique index -- so two concurrent no-variant addItem
+  /// calls could in principle produce two separate no-variant lines for
+  /// the same product. An accepted trade-off (same category as
+  /// Cart.userId/guestToken's app-layer-only exclusivity) rather than a
+  /// partial-index migration -- see CartService.upsertItemQuantity.
+  @@unique([cartId, productId, variantId])
+  @@map("cart_items")
+}
+
+/// Requires an account -- there is no guest checkout (see docs/orders.md).
+/// Every money/identity field that must survive a later Product/Category
+/// change is snapshotted here at placement time, never referenced live.
+model Order {
+  id     String @id @default(uuid(7))
+  userId String @map("user_id")
+
+  /// Restrict, not Cascade: an order is a financial record, not a cart --
+  /// deleting a user must never silently delete their order history. No
+  /// user-deletion feature exists yet, but this constraint is the backstop
+  /// for whenever one does.
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  status OrderStatus @default(PLACED)
+
+  items OrderItem[]
+
+  /// Sum of item lineTotals at placement time -- not recomputed from
+  /// current Product prices. See "Future order history and price
+  /// snapshots" below and in docs/database.md.
+  subtotal Decimal @db.Decimal(12, 2)
+  currency String  @db.VarChar(3)
+
+  // Shipping address is embedded, not a separate reusable Address model --
+  // an order's address must stay exactly what it was at placement even if
+  // the customer's saved address later changes. See docs/orders.md.
+  shippingRecipientName String  @map("shipping_recipient_name")
+  shippingLine1         String  @map("shipping_line1")
+  shippingLine2         String? @map("shipping_line2")
+  shippingCity          String  @map("shipping_city")
+  shippingState         String  @map("shipping_state")
+  shippingPostalCode    String  @map("shipping_postal_code")
+  /// ISO 3166-1 alpha-2 (e.g. "US").
+  shippingCountry       String  @map("shipping_country") @db.VarChar(2)
+  shippingPhone         String? @map("shipping_phone")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@map("orders")
+}
+
+/// One row per product purchased in an order. Everything here is a
+/// snapshot at purchase time -- a later change to the Product's name, SKU,
+/// or price must never rewrite what a customer's receipt says they paid.
+/// See docs/database.md's "Future order history and price snapshots",
+/// which anticipated exactly this model.
+model OrderItem {
+  id      String @id @default(uuid(7))
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Restrict, not Cascade/SetNull: a product with order history must
+  /// never be hard-deleted (archive it instead -- see docs/database.md's
+  /// Product section). This constraint makes that the only option.
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  /// Optional narrowing of productId, same as CartItem.variantId. Restrict
+  /// for the same reason as productId above -- a variant with order history
+  /// must never be hard-deleted either.
+  variantId String?         @map("variant_id")
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  productName String  @map("product_name")
+  productSku  String  @map("product_sku")
+
+  /// Snapshots of the variant, populated only when variantId is set -- same
+  /// "never rewrite a past receipt" principle as productName/productSku
+  /// above: a later variant edit/archive must not change what this line
+  /// says was purchased.
+  variantSku        String? @map("variant_sku")
+  variantAttributes Json?   @map("variant_attributes")
+
+  unitPrice Decimal @map("unit_price") @db.Decimal(12, 2)
+  quantity  Int
+  lineTotal Decimal @map("line_total") @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("order_items")
+}
