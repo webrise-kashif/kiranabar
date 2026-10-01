@@ -28,11 +28,15 @@ export class RefreshTokenService {
     return createHash("sha256").update(token).digest("hex");
   }
 
-  async issue(userId: string): Promise<IssuedRefreshToken> {
+  /** `client` lets `rotate()` issue inside its transaction; defaults to the root client. */
+  async issue(
+    userId: string,
+    client: Pick<PrismaService, "refreshToken"> = this.prisma,
+  ): Promise<IssuedRefreshToken> {
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + parseDurationMs(this.config.auth.refreshTokenTtl));
 
-    await this.prisma.refreshToken.create({
+    await client.refreshToken.create({
       data: { userId, tokenHash: this.hash(token), expiresAt },
     });
 
@@ -57,12 +61,28 @@ export class RefreshTokenService {
       throw new UnauthorizedException("Refresh token has expired");
     }
 
-    await this.prisma.refreshToken.update({
-      where: { id: existing.id },
-      data: { revokedAt: new Date() },
+    // The checks above read a snapshot; two concurrent refreshes with the
+    // same token both pass them. The conditional claim decides the winner:
+    // it takes the row lock, so a concurrent loser waits for the winner's
+    // whole transaction (claim + replacement token) to commit, then matches
+    // no row. The loser is then treated as reuse -- and because the winner's
+    // replacement is already committed, revokeAllForUser revokes it too.
+    const next = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.refreshToken.updateMany({
+        where: { id: existing.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      return claimed.count === 1 ? this.issue(existing.userId, tx) : null;
     });
 
-    const next = await this.issue(existing.userId);
+    if (!next) {
+      // Outside the transaction on purpose: a revoke inside it would be
+      // rolled back along with the failed rotation.
+      await this.revokeAllForUser(existing.userId);
+      throw new UnauthorizedException("Refresh token has already been used");
+    }
+
     return { userId: existing.userId, ...next };
   }
 
