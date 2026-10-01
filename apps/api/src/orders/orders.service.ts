@@ -222,12 +222,7 @@ export class OrdersService {
           data: { status: "CANCELLED" },
           include: ORDER_INCLUDE,
         })
-        .catch((error: unknown) => {
-          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-            throw new NotCancellableException();
-          }
-          throw error;
-        });
+        .catch(whenNoRowMatched(() => new NotCancellableException()));
 
       // No version guard needed here -- unlike a decrement, restoring
       // stock is commutative: it's always safe to apply regardless of
@@ -269,14 +264,42 @@ export class OrdersService {
       );
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: targetStatus },
-      include: ORDER_INCLUDE,
-    });
+    // Guarded on the status just read, so the transition validated above is
+    // the one actually applied. If the order moved in between (a concurrent
+    // cancel, or another admin's identical update), this matches no row and
+    // throws P2025 instead of silently overwriting -- e.g. turning a
+    // CANCELLED order, whose stock was already restored, into PAID.
+    const updated = await this.prisma.order
+      .update({
+        where: { id: orderId, status: order.status },
+        data: { status: targetStatus },
+        include: ORDER_INCLUDE,
+      })
+      .catch(
+        whenNoRowMatched(
+          () =>
+            new ConflictException(
+              "Order changed while you were updating it -- refetch and try again",
+            ),
+        ),
+      );
 
     return toOrder(updated);
   }
+}
+
+/**
+ * For a `.catch()` on an update guarded by a `where` beyond the id (e.g. on
+ * status): Prisma reports "no row matched" as P2025. Turn that into the
+ * given domain exception; rethrow anything else unchanged.
+ */
+function whenNoRowMatched(toException: () => Error): (error: unknown) => never {
+  return (error) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      throw toException();
+    }
+    throw error;
+  };
 }
 
 class NotCancellableException extends ForbiddenException {

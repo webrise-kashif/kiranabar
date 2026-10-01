@@ -1,3 +1,4 @@
+import { ConflictException } from "@nestjs/common";
 import type { PaginationQuery } from "@kiranabar/validation";
 import type { Cart as CartType } from "@kiranabar/types";
 import { Prisma } from "@prisma/client";
@@ -469,9 +470,32 @@ describe("OrdersService", () => {
       const result = await service.updateStatus("order-1", "PAID");
 
       expect(prisma.order.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: "order-1" }, data: { status: "PAID" } }),
+        expect.objectContaining({
+          where: { id: "order-1", status: "PLACED" },
+          data: { status: "PAID" },
+        }),
       );
       expect(result.status).toBe("PAID");
+    });
+
+    it("409s instead of overwriting when the order changed between read and write (e.g. a concurrent cancel)", async () => {
+      // Read as PLACED, but the customer cancelled before the write, so the
+      // update guarded on the status we read matches no row.
+      prisma.order.findUnique.mockResolvedValue(buildOrderRow({ status: "PLACED" }));
+      prisma.order.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("No record was found for an update.", {
+          code: "P2025",
+          clientVersion: "test",
+        }),
+      );
+
+      const attempt = service.updateStatus("order-1", "PAID");
+
+      await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+      await expect(attempt).rejects.toThrow(/changed while you were updating it/);
+      expect(prisma.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "order-1", status: "PLACED" } }),
+      );
     });
 
     it("rejects skipping a stage (PLACED straight to SHIPPED)", async () => {
