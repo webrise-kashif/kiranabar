@@ -125,6 +125,15 @@ global filter normalizes whatever Nest produces into the shared envelope, so
 handlers should throw the semantically correct exception rather than
 hand-rolling a response.
 
+An `HttpException`'s message is shown to the client as written, so only put
+client-appropriate text in it. Any other error (a Prisma failure, a bug, a
+thrown non-`Error`) is treated as unexpected: the client gets a generic
+`500` (`{ "code": "INTERNAL_SERVER_ERROR", "message": "Internal server error" }`)
+and the full message and stack trace are logged server-side. Express
+middleware errors marked client-safe (`expose: true`, always 4xx — e.g. a
+`413 PAYLOAD_TOO_LARGE` for an oversized body) keep their own status and
+message.
+
 ## What exists today
 
 | Method   | Path                                                 | Access                             | Purpose                                                                                                          |
