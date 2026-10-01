@@ -6,6 +6,7 @@ import {
   createProductVariantSchema,
   productQuerySchema,
   productVariantAttributesSchema,
+  STORE_CURRENCY,
   updateProductSchema,
   updateProductVariantSchema,
 } from "./product";
@@ -168,5 +169,35 @@ describe("adjustInventorySchema", () => {
     const result = adjustInventorySchema.parse({ quantityAvailable: 10, version: 3 });
 
     expect(result).toEqual({ quantityAvailable: 10, version: 3 });
+  });
+});
+
+describe("store currency (single currency for the MVP)", () => {
+  it("exports USD as the store currency", () => {
+    expect(STORE_CURRENCY).toBe("USD");
+  });
+
+  it.each([
+    ["createProductSchema", createProductSchema, VALID_PRODUCT],
+    ["updateProductSchema", updateProductSchema, {}],
+    ["createProductVariantSchema", createProductVariantSchema, VALID_VARIANT],
+    ["updateProductVariantSchema", updateProductVariantSchema, {}],
+  ] as const)("%s rejects any other currency", (_name, schema, base) => {
+    const result = schema.safeParse({ ...base, currency: "EUR" });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ["currency"],
+      message: "Only USD is supported",
+    });
+  });
+
+  it.each([
+    ["createProductSchema", createProductSchema, VALID_PRODUCT],
+    ["updateProductSchema", updateProductSchema, {}],
+    ["createProductVariantSchema", createProductVariantSchema, VALID_VARIANT],
+    ["updateProductVariantSchema", updateProductVariantSchema, {}],
+  ] as const)("%s accepts the store currency case-insensitively", (_name, schema, base) => {
+    expect(schema.parse({ ...base, currency: " usd " }).currency).toBe("USD");
   });
 });

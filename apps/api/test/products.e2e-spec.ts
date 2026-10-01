@@ -77,6 +77,18 @@ describe("Products (e2e)", () => {
         .expect(400);
     });
 
+    it("rejects a currency other than the store currency, so a cart can never mix currencies", async () => {
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/products")
+        .set("Cookie", adminCookies)
+        .send({ name: "Spec Product", slug, sku, price: "10.00", currency: "EUR" })
+        .expect(400);
+
+      expect(res.body.error.details).toEqual([
+        expect.objectContaining({ path: ["currency"], message: "Only USD is supported" }),
+      ]);
+    });
+
     it("ADMIN creates a product with initial images and stock", async () => {
       const res = await request(app.getHttpServer())
         .post("/api/v1/products")
