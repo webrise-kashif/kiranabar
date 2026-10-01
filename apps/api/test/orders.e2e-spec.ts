@@ -22,6 +22,7 @@ describe("Orders (e2e)", () => {
   const sku = `ORDER-SPEC-${RUN_ID}`;
   const emailA = `order-spec-a-${RUN_ID}@example.com`;
   const emailB = `order-spec-b-${RUN_ID}@example.com`;
+  const emailC = `order-spec-c-${RUN_ID}@example.com`;
   const password = "correct horse battery staple";
 
   let productId: string;
@@ -102,9 +103,9 @@ describe("Orders (e2e)", () => {
   });
 
   afterAll(async () => {
-    await prisma.order.deleteMany({ where: { user: { email: { in: [emailA, emailB] } } } });
-    await prisma.cart.deleteMany({ where: { user: { email: { in: [emailA, emailB] } } } });
-    await prisma.user.deleteMany({ where: { email: { in: [emailA, emailB] } } });
+    await prisma.order.deleteMany({ where: { user: { email: { in: [emailA, emailB, emailC] } } } });
+    await prisma.cart.deleteMany({ where: { user: { email: { in: [emailA, emailB, emailC] } } } });
+    await prisma.user.deleteMany({ where: { email: { in: [emailA, emailB, emailC] } } });
     await prisma.product.deleteMany({ where: { slug } });
     await app.close();
   });
@@ -274,6 +275,39 @@ describe("Orders (e2e)", () => {
       .patch(`/api/v1/orders/${secondOrderId}/cancel`)
       .set("Cookie", userACookies)
       .expect(403);
+  });
+
+  it("restores stock exactly once when the same order is cancelled concurrently", async () => {
+    const userCCookies = await registerAndLogin(emailC);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/cart/items")
+      .set("Cookie", userCCookies)
+      .send({ productId, quantity: 2 })
+      .expect(201);
+
+    const checkout = await request(app.getHttpServer())
+      .post("/api/v1/orders/checkout")
+      .set("Cookie", userCCookies)
+      .send({ shippingAddress: SHIPPING_ADDRESS })
+      .expect(201);
+    const raceOrderId = checkout.body.data.id as string;
+
+    const before = await getInventory();
+
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        request(app.getHttpServer())
+          .patch(`/api/v1/orders/${raceOrderId}/cancel`)
+          .set("Cookie", userCCookies),
+      ),
+    );
+
+    const statuses = responses.map((res) => res.status).sort();
+    expect(statuses).toEqual([200, 403, 403, 403, 403]);
+
+    const after = await getInventory();
+    expect(after.quantityAvailable).toBe(before.quantityAvailable + 2);
   });
 
   describe("variant checkout", () => {
