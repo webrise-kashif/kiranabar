@@ -440,6 +440,9 @@ status update. Every transition must be the order's immediate next stage
 (`PLACED`→`PAID`→`SHIPPED`→`DELIVERED`); skipping a stage, moving
 backward, or updating a `CANCELLED`/already-`DELIVERED` order all return
 `409`.
+A status update that races another change to the same order (a concurrent
+cancel, or another admin advancing it first) also returns `409` — refetch
+the order and retry — rather than overwriting the newer status.
 
 Every future entry in this table must trace back to an item in
 `docs/requirements.md`. Do not add a row here to describe a hoped-for or assumed

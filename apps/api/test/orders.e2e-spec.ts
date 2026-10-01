@@ -23,6 +23,7 @@ describe("Orders (e2e)", () => {
   const emailA = `order-spec-a-${RUN_ID}@example.com`;
   const emailB = `order-spec-b-${RUN_ID}@example.com`;
   const emailC = `order-spec-c-${RUN_ID}@example.com`;
+  const emailD = `order-spec-d-${RUN_ID}@example.com`;
   const password = "correct horse battery staple";
 
   let productId: string;
@@ -103,9 +104,13 @@ describe("Orders (e2e)", () => {
   });
 
   afterAll(async () => {
-    await prisma.order.deleteMany({ where: { user: { email: { in: [emailA, emailB, emailC] } } } });
-    await prisma.cart.deleteMany({ where: { user: { email: { in: [emailA, emailB, emailC] } } } });
-    await prisma.user.deleteMany({ where: { email: { in: [emailA, emailB, emailC] } } });
+    await prisma.order.deleteMany({
+      where: { user: { email: { in: [emailA, emailB, emailC, emailD] } } },
+    });
+    await prisma.cart.deleteMany({
+      where: { user: { email: { in: [emailA, emailB, emailC, emailD] } } },
+    });
+    await prisma.user.deleteMany({ where: { email: { in: [emailA, emailB, emailC, emailD] } } });
     await prisma.product.deleteMany({ where: { slug } });
     await app.close();
   });
@@ -472,6 +477,44 @@ describe("Orders (e2e)", () => {
         .set("Cookie", adminCookies)
         .send({ status: "PAID" })
         .expect(409);
+    });
+
+    describe("concurrent status changes", () => {
+      let userDCookies: string[];
+
+      beforeAll(async () => {
+        userDCookies = await registerAndLogin(emailD);
+      });
+
+      async function placeOrder(quantity: number): Promise<string> {
+        await request(app.getHttpServer())
+          .post("/api/v1/cart/items")
+          .set("Cookie", userDCookies)
+          .send({ productId, quantity })
+          .expect(201);
+        const checkout = await request(app.getHttpServer())
+          .post("/api/v1/orders/checkout")
+          .set("Cookie", userDCookies)
+          .send({ shippingAddress: SHIPPING_ADDRESS })
+          .expect(201);
+        return checkout.body.data.id as string;
+      }
+
+      function markPaid(id: string): request.Test {
+        return request(app.getHttpServer())
+          .patch(`/api/v1/orders/${id}/status`)
+          .set("Cookie", adminCookies)
+          .send({ status: "PAID" });
+      }
+
+      it("lets exactly one of several concurrent identical advances succeed", async () => {
+        const raceOrderId = await placeOrder(1);
+
+        const responses = await Promise.all(Array.from({ length: 5 }, () => markPaid(raceOrderId)));
+
+        const statuses = responses.map((res) => res.status).sort();
+        expect(statuses).toEqual([200, 409, 409, 409, 409]);
+      });
     });
   });
 });

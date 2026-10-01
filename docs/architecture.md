@@ -441,7 +441,11 @@ history":
   terminal, with no next stage) all return `409`, the same status code
   used for every other "the resource's current state doesn't allow this
   operation" case in this API (a stale inventory `version`, a duplicate
-  slug). This was a deliberate scope decision for this phase, not a
+  slug). The write is guarded on the status that was just validated
+  (`where: { id, status }`), so a concurrent cancel or a second admin
+  advancing the same order makes it match no row and `409` — without the
+  guard, it could silently turn a `CANCELLED` order (stock already
+  restored) into `PAID`. This was a deliberate scope decision for this phase, not a
   technical constraint — a looser "any forward status" rule was considered
   and rejected in favor of matching a real fulfillment pipeline's
   guardrails.
