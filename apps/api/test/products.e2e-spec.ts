@@ -364,6 +364,33 @@ describe("Products (e2e)", () => {
       expect(product.body.data.sku).toBe(sku);
     });
 
+    it("hides a non-ACTIVE variant from public browsing, but not from admins", async () => {
+      const draft = await request(app.getHttpServer())
+        .post(`/api/v1/products/${productId}/variants`)
+        .set("Cookie", adminCookies)
+        .send({
+          sku: `${sku}-DRAFT-L`,
+          price: "29.99",
+          attributes: { color: "Red", size: "L" },
+          status: "DRAFT",
+        })
+        .expect(201);
+      const draftId = draft.body.data.id as string;
+
+      const publicView = await request(app.getHttpServer())
+        .get(`/api/v1/products/${slug}`)
+        .expect(200);
+      const publicIds = publicView.body.data.variants.map((v: { id: string }) => v.id);
+      expect(publicIds).toContain(variantId);
+      expect(publicIds).not.toContain(draftId);
+
+      const adminView = await request(app.getHttpServer())
+        .get(`/api/v1/products/${slug}`)
+        .set("Cookie", adminCookies)
+        .expect(200);
+      expect(adminView.body.data.variants.map((v: { id: string }) => v.id)).toContain(draftId);
+    });
+
     it("rejects a duplicate variant SKU with 409", async () => {
       await request(app.getHttpServer())
         .post(`/api/v1/products/${productId}/variants`)
