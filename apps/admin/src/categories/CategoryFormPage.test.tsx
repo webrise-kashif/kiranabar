@@ -75,4 +75,37 @@ describe("CategoryFormPage", () => {
     expect(await screen.findByDisplayValue("Shirts")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Edit Shirts" })).toBeInTheDocument();
   });
+
+  it("clears the description and parent when emptied on edit", async () => {
+    const child = {
+      ...CATEGORY,
+      id: "c2",
+      name: "Tees",
+      slug: "tees",
+      description: "Short sleeves",
+      parentId: "c1",
+    };
+    let patchBody: unknown;
+    mockFetchRoutes({
+      "GET /categories/c2": () => jsonResponse({ data: child }),
+      "GET /categories": () =>
+        jsonResponse({ data: { items: [CATEGORY, child], total: 2, page: 1, pageSize: 100 } }),
+      "PATCH /categories/c2": (init) => {
+        patchBody = JSON.parse(init?.body as string);
+        return jsonResponse({ data: { ...child, description: null, parentId: null } });
+      },
+    });
+
+    renderAt("/categories/c2");
+    const user = userEvent.setup();
+
+    await user.clear(await screen.findByLabelText(/^Description/));
+    await user.selectOptions(screen.getByLabelText(/^Parent category/), "None");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    // An emptied field must be sent as null ("clear it") -- omitting it
+    // would leave the stored value unchanged.
+    expect(patchBody).toMatchObject({ description: null, parentId: null });
+  });
 });

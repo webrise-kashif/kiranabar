@@ -20,7 +20,20 @@ export const createCategorySchema = z.object({
 });
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 
-export const updateCategorySchema = createCategorySchema.partial();
+/**
+ * Written out field by field rather than `createCategorySchema.partial()`:
+ * in Zod 4 a partial keeps create's `.default("DRAFT")` on `status`, so an
+ * update that didn't mention status (e.g. a rename) silently reset an
+ * ACTIVE category to DRAFT. `null` clears an optional field;
+ * `parentId: null` moves the category to the top level.
+ */
+export const updateCategorySchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200).optional(),
+  slug: slugSchema.optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
+  status: categoryStatusSchema.optional(),
+  parentId: z.string().uuid().nullable().optional(),
+});
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 
 export const categoryQuerySchema = paginationQuerySchema.extend({
