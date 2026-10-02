@@ -57,36 +57,70 @@ async function onLogout(): Promise<void> {
 </script>
 
 <template>
-  <header>
-    <h1>Web Store</h1>
-    <p v-if="health">API status: {{ health.status }}</p>
-    <p v-if="healthError" role="alert">Could not reach API: {{ healthError }}</p>
+  <div class="min-h-screen bg-gray-50">
+    <header class="border-b border-gray-200 bg-white">
+      <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
+        <div>
+          <h1 class="text-xl font-bold text-gray-900">Web Store</h1>
+          <p v-if="health" class="text-xs text-gray-500">API status: {{ health.status }}</p>
+          <p v-if="healthError" role="alert" class="text-xs text-red-600">
+            Could not reach API: {{ healthError }}
+          </p>
+        </div>
 
-    <section v-if="user">
-      <p>Signed in as {{ user.email }} ({{ user.role }})</p>
-      <button type="button" @click="onLogout">Log out</button>
-    </section>
+        <section v-if="user" class="flex items-center gap-3 text-sm text-gray-700">
+          <p>Signed in as {{ user.email }} ({{ user.role }})</p>
+          <button
+            type="button"
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 font-medium shadow-sm hover:bg-gray-50"
+            @click="onLogout"
+          >
+            Log out
+          </button>
+        </section>
 
-    <section v-else>
-      <form @submit.prevent="onSubmit">
-        <label>
-          Email
-          <input v-model="email" type="email" required autocomplete="email" />
-        </label>
-        <label>
-          Password
-          <input v-model="password" type="password" required autocomplete="current-password" />
-        </label>
-        <button type="submit" :disabled="submitting">
-          {{ mode === "login" ? "Log in" : "Register" }}
-        </button>
-      </form>
-      <button type="button" @click="mode = mode === 'login' ? 'register' : 'login'">
-        {{ mode === "login" ? "Need an account? Register" : "Already have an account? Log in" }}
-      </button>
-      <p v-if="authError" role="alert">{{ authError }}</p>
-    </section>
-  </header>
+        <section v-else class="flex flex-col items-end gap-1">
+          <form class="flex flex-wrap items-end gap-2" @submit.prevent="onSubmit">
+            <label class="text-xs font-medium text-gray-700">
+              Email
+              <input
+                v-model="email"
+                type="email"
+                required
+                autocomplete="email"
+                class="block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+              />
+            </label>
+            <label class="text-xs font-medium text-gray-700">
+              Password
+              <input
+                v-model="password"
+                type="password"
+                required
+                autocomplete="current-password"
+                class="block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+              />
+            </label>
+            <button
+              type="submit"
+              :disabled="submitting"
+              class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {{ mode === "login" ? "Log in" : "Register" }}
+            </button>
+          </form>
+          <button
+            type="button"
+            class="text-xs text-indigo-600 hover:underline"
+            @click="mode = mode === 'login' ? 'register' : 'login'"
+          >
+            {{ mode === "login" ? "Need an account? Register" : "Already have an account? Log in" }}
+          </button>
+          <p v-if="authError" role="alert" class="text-xs text-red-600">{{ authError }}</p>
+        </section>
+      </div>
+    </header>
 
-  <NuxtPage />
+    <NuxtPage />
+  </div>
 </template>

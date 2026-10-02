@@ -114,6 +114,11 @@ Already wired in `apps/api/src/main.ts` and `apps/api/src/common`:
   in `app/composables/`, never call `fetch`/`$fetch` directly from a component.
 - **React (admin)**: functional components + hooks only. Co-locate a component's
   test as `Component.test.tsx` next to it.
+- **Styling**: Tailwind CSS v4 in both frontends, via `@tailwindcss/vite` (same
+  version in `apps/store` and `apps/admin`). Style with utility classes in
+  templates/JSX — no `<style>` blocks, inline `style` attributes, or separate
+  component CSS files. Each app's only stylesheet is its one-line
+  `@import "tailwindcss";` entry.
 - **Formatting**: Prettier via `packages/config/prettier.mjs` (root `.prettierrc.mjs`
   re-exports it). Run `pnpm format` before committing.
 - **Linting**: ESLint flat config per app, composed from `packages/config/eslint/*`.
