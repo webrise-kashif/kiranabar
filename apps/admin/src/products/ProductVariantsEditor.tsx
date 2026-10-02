@@ -1,4 +1,5 @@
 import type { ProductVariant } from "@kiranabar/types";
+import { STORE_CURRENCY } from "@kiranabar/validation";
 import { useState, type FormEvent } from "react";
 import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
@@ -32,7 +33,6 @@ export function ProductVariantsEditor({
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
-  const [currency, setCurrency] = useState("USD");
   const [initialQuantity, setInitialQuantity] = useState("0");
   const [attributeRows, setAttributeRows] = useState<AttributeRow[]>([{ key: "", value: "" }]);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function ProductVariantsEditor({
         sku,
         price,
         salePrice: salePrice || undefined,
-        currency,
+        currency: STORE_CURRENCY,
         attributes,
         status: "ACTIVE",
         initialQuantity: Number(initialQuantity),
@@ -82,7 +82,6 @@ export function ProductVariantsEditor({
       setSku("");
       setPrice("");
       setSalePrice("");
-      setCurrency("USD");
       setInitialQuantity("0");
       setAttributeRows([{ key: "", value: "" }]);
       setToastMessage(`Variant "${created.sku}" created.`);
@@ -214,13 +213,12 @@ export function ProductVariantsEditor({
           </div>
           <div className="w-24">
             <Field label="Currency" htmlFor="variant-currency" required>
+              {/* Fixed to the single store currency -- see STORE_CURRENCY. */}
               <input
                 id="variant-currency"
                 type="text"
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value.toUpperCase())}
-                maxLength={3}
-                required
+                value={STORE_CURRENCY}
+                readOnly
                 className={inputClass}
               />
             </Field>

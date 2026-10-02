@@ -71,6 +71,37 @@ describe("ProductFormPage", () => {
     expect(await screen.findByText('Product "Classic Tee" created.')).toBeInTheDocument();
   });
 
+  it("fixes the currency to the store currency (USD) instead of an editable field", async () => {
+    let postBody: unknown;
+    mockFetchRoutes({
+      "GET /categories": () =>
+        jsonResponse({ data: { items: [], total: 0, page: 1, pageSize: 100 } }),
+      "POST /products": (init) => {
+        postBody = JSON.parse(init?.body as string);
+        return jsonResponse({ data: PRODUCT }, 201);
+      },
+    });
+
+    renderAt("/products/new");
+    const user = userEvent.setup();
+
+    const currency = screen.getByLabelText(/^Currency/);
+    // Select the current text and type over it, as an admin would. (On an
+    // editable field this replaces "USD"; a read-only one ignores it.)
+    await user.tripleClick(currency);
+    await user.keyboard("EUR");
+    expect(currency).toHaveValue("USD");
+
+    await user.type(screen.getByLabelText(/^Name/), "Classic Tee");
+    await user.type(screen.getByLabelText(/^Slug/), "classic-tee");
+    await user.type(screen.getByLabelText(/^SKU/), "TSHIRT-001");
+    await user.type(screen.getByLabelText(/^Price/), "24.99");
+    await user.click(screen.getByRole("button", { name: "Create product" }));
+
+    expect(await screen.findByText('Product "Classic Tee" created.')).toBeInTheDocument();
+    expect(postBody).toMatchObject({ currency: "USD" });
+  });
+
   it("loads an existing product's fields for editing", async () => {
     mockFetchRoutes({
       "GET /categories": () =>

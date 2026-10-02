@@ -1,5 +1,5 @@
 import type { Product, ProductStatus } from "@kiranabar/types";
-import { createProductSchema, updateProductSchema } from "@kiranabar/validation";
+import { createProductSchema, STORE_CURRENCY, updateProductSchema } from "@kiranabar/validation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Button } from "../components/Button";
@@ -21,7 +21,6 @@ interface FormState {
   sku: string;
   price: string;
   salePrice: string;
-  currency: string;
   status: ProductStatus;
   categoryId: string;
   initialQuantity: string;
@@ -34,7 +33,6 @@ const EMPTY_FORM: FormState = {
   sku: "",
   price: "",
   salePrice: "",
-  currency: "USD",
   status: "DRAFT",
   categoryId: "",
   initialQuantity: "0",
@@ -48,7 +46,6 @@ function toFormState(product: Product): FormState {
     sku: product.sku,
     price: product.price,
     salePrice: product.salePrice ?? "",
-    currency: product.currency,
     status: product.status,
     categoryId: product.categoryId ?? "",
     initialQuantity: "0",
@@ -112,7 +109,7 @@ export function ProductFormPage() {
           sku: form.sku,
           price: form.price,
           salePrice: orUndefined(form.salePrice),
-          currency: form.currency,
+          currency: STORE_CURRENCY,
           status: form.status,
           categoryId: orUndefined(form.categoryId),
           initialQuantity: form.initialQuantity,
@@ -129,7 +126,7 @@ export function ProductFormPage() {
           sku: form.sku,
           price: form.price,
           salePrice: orUndefined(form.salePrice) ?? null,
-          currency: form.currency,
+          currency: STORE_CURRENCY,
           status: form.status,
           categoryId: orUndefined(form.categoryId) ?? null,
         });
@@ -208,13 +205,13 @@ export function ProductFormPage() {
             />
           </Field>
           <Field label="Currency" htmlFor="product-currency" required>
+            {/* The store sells in one currency (see STORE_CURRENCY), so this is
+                shown for clarity but isn't editable. */}
             <input
               id="product-currency"
               type="text"
-              value={form.currency}
-              onChange={(event) => updateField("currency", event.target.value.toUpperCase())}
-              maxLength={3}
-              required
+              value={STORE_CURRENCY}
+              readOnly
               className={inputClass}
             />
           </Field>

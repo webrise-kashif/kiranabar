@@ -49,6 +49,35 @@ describe("ProductVariantsEditor", () => {
     expect(await screen.findByDisplayValue("3")).toBeInTheDocument(); // nested inventory editor
   });
 
+  it("fixes the currency to the store currency (USD) instead of an editable field", async () => {
+    let postBody: unknown;
+    mockFetchRoutes({
+      "POST /products/p1/variants": (init) => {
+        postBody = JSON.parse(init?.body as string);
+        return jsonResponse({ data: VARIANT }, 201);
+      },
+    });
+    render(<ProductVariantsEditor productId="p1" variants={[]} onChange={vi.fn()} />);
+    const user = userEvent.setup();
+
+    const currency = screen.getByLabelText(/^Currency/);
+    // Select the current text and type over it, as an admin would. (On an
+    // editable field this replaces "USD"; a read-only one ignores it.)
+    await user.tripleClick(currency);
+    await user.keyboard("EUR");
+    expect(currency).toHaveValue("USD");
+
+    await user.type(screen.getByLabelText(/^SKU/), "TSHIRT-001-RED-M");
+    await user.type(screen.getByLabelText(/^Price/), "26.99");
+    await user.type(screen.getByLabelText("Name"), "Color");
+    await user.type(screen.getByLabelText("Value"), "Red");
+    await user.click(screen.getByRole("button", { name: "Add variant" }));
+
+    await vi.waitFor(() => {
+      expect(postBody).toMatchObject({ currency: "USD" });
+    });
+  });
+
   it("submits the add-variant form and calls onChange", async () => {
     mockFetchRoutes({
       "POST /products/p1/variants": () => jsonResponse({ data: VARIANT }, 201),
