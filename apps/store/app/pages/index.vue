@@ -99,27 +99,27 @@ function primaryImage(product: Product) {
       <article
         v-for="product in data?.items ?? []"
         :key="product.id"
-        class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+        class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
       >
-        <img
-          v-if="primaryImage(product)"
-          :src="primaryImage(product)!.url"
-          :alt="primaryImage(product)!.altText ?? product.name"
-          class="aspect-square w-full object-cover"
-        />
-        <div v-else class="aspect-square w-full bg-gray-100" aria-hidden="true" />
-        <div class="p-4">
-          <h2 class="text-sm font-medium text-gray-900">{{ product.name }}</h2>
-          <p v-if="product.salePrice" class="mt-1 text-sm font-semibold text-red-600">
-            {{ formatMoney(product.salePrice, product.currency) }}
-            <s class="ml-2 font-normal text-gray-500">{{
-              formatMoney(product.price, product.currency)
-            }}</s>
-          </p>
-          <p v-else class="mt-1 text-sm font-semibold text-gray-900">
-            {{ formatMoney(product.price, product.currency) }}
-          </p>
-        </div>
+        <NuxtLink :to="`/products/${product.slug}`" class="block">
+          <img
+            v-if="primaryImage(product)"
+            :src="primaryImage(product)!.url"
+            :alt="primaryImage(product)!.altText ?? product.name"
+            class="aspect-square w-full object-cover"
+          />
+          <div v-else class="aspect-square w-full bg-gray-100" aria-hidden="true" />
+          <div class="p-4">
+            <h2 class="text-sm font-medium text-gray-900">{{ product.name }}</h2>
+            <p class="mt-1">
+              <PriceTag
+                :price="product.price"
+                :sale-price="product.salePrice"
+                :currency="product.currency"
+              />
+            </p>
+          </div>
+        </NuxtLink>
       </article>
     </div>
 

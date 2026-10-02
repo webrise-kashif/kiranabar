@@ -214,4 +214,20 @@ describe("Catalog page", () => {
 
     expect(wrapper.find("nav[aria-label=Pagination]").exists()).toBe(false);
   });
+
+  it("links each product card to its detail page", async () => {
+    mockFetchRoutes({
+      "/categories": NO_CATEGORIES,
+      "/products": () =>
+        jsonResponse(page([product(), product({ id: "p2", name: "Hoodie", slug: "hoodie" })])),
+    });
+
+    const wrapper = await mountSuspended(CatalogPage);
+    await flushPromises();
+
+    expect(wrapper.findAll("article").map((card) => card.find("a").attributes("href"))).toEqual([
+      "/products/classic-tee",
+      "/products/hoodie",
+    ]);
+  });
 });
