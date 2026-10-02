@@ -123,10 +123,12 @@ export function ProductFormPage() {
         const input = updateProductSchema.parse({
           name: form.name,
           slug: form.slug,
-          description: orUndefined(form.description),
+          // An emptied optional field is sent as null (clear it); omitting it
+          // would leave the stored value unchanged.
+          description: orUndefined(form.description) ?? null,
           sku: form.sku,
           price: form.price,
-          salePrice: orUndefined(form.salePrice),
+          salePrice: orUndefined(form.salePrice) ?? null,
           currency: form.currency,
           status: form.status,
           categoryId: orUndefined(form.categoryId) ?? null,

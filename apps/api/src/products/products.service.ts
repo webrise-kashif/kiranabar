@@ -145,7 +145,9 @@ export class ProductsService {
     }
 
     const resolvedPrice = input.price ?? existing.price.toString();
-    const resolvedSalePrice = input.salePrice ?? existing.salePrice?.toString();
+    // null clears the sale price; only an omitted field keeps the stored one.
+    const resolvedSalePrice =
+      input.salePrice === undefined ? existing.salePrice?.toString() : input.salePrice;
 
     if (resolvedSalePrice && Number(resolvedSalePrice) >= Number(resolvedPrice)) {
       throw new BadRequestException("salePrice must be less than price");
@@ -247,7 +249,8 @@ export class ProductsService {
       await this.prisma.productImage.updateMany({
         where: {
           productId,
-          variantId: input.variantId ?? existingImage.variantId,
+          // null moves the photo to the general gallery; omitted keeps its group.
+          variantId: input.variantId === undefined ? existingImage.variantId : input.variantId,
           isPrimary: true,
           NOT: { id: imageId },
         },
@@ -303,7 +306,9 @@ export class ProductsService {
     const existing = await this.assertVariantExists(productId, variantId);
 
     const resolvedPrice = input.price ?? existing.price.toString();
-    const resolvedSalePrice = input.salePrice ?? existing.salePrice?.toString();
+    // null clears the sale price; only an omitted field keeps the stored one.
+    const resolvedSalePrice =
+      input.salePrice === undefined ? existing.salePrice?.toString() : input.salePrice;
 
     if (resolvedSalePrice && Number(resolvedSalePrice) >= Number(resolvedPrice)) {
       throw new BadRequestException("salePrice must be less than price");
