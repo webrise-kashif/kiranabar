@@ -146,6 +146,11 @@ catalog that doesn't have a confirmed depth requirement.
   column doesn't. No currency-specific decimal-place handling (e.g. 0 for
   JPY, 3 for KWD) is implemented — `Decimal(12, 2)` is a fixed-precision
   simplification, flagged here for whoever adds multi-currency support.
+  **For the MVP, only `USD` is accepted** (`STORE_CURRENCY` in
+  `packages/validation`, enforced on product and variant create/update):
+  multi-currency is out of scope, and allowing per-product currencies let a
+  cart sum USD and EUR prices into one meaningless total. The column stays,
+  so real multi-currency support later is an additive change.
 - **`sku` and `slug` are both globally unique**, enforced at the database
   level (verified live: a duplicate SKU insert is rejected). `slug` is the
   public URL identifier; `sku` is the operational/inventory identifier —
@@ -372,10 +377,10 @@ above was written in anticipation of — it's now real.
   is supposed to track current pricing.
 - **`Order.subtotal`/`OrderItem.unitPrice`/`OrderItem.lineTotal` are
   `Decimal(12, 2)`**, same reasoning as `Product.price` above. `currency`
-  is copied from the cart at checkout time (itself derived from the
-  product), not re-derived per line — this schema doesn't yet support
-  mixed-currency carts, which is consistent with `Product.currency` being a
-  single column today.
+  is copied from the cart at checkout time (always `STORE_CURRENCY`), not
+  re-derived per line — mixed-currency carts can't exist, because every
+  product and variant is priced in the single store currency (see
+  `Product.currency` above).
 - **The shipping address is denormalized directly onto `Order`** (
   `shippingRecipientName`, `shippingLine1`, `shippingLine2`,
   `shippingCity`, `shippingState`, `shippingPostalCode`,

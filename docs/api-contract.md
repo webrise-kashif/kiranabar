@@ -242,6 +242,11 @@ violating this is `400` on create, and on update if both are present in the
 same request (an update that only touches `salePrice` is checked against
 the product's current stored `price` in the service layer, not statically).
 
+`currency` (on products and variants) defaults to `"USD"` and is the only
+accepted value — the store sells in a single currency for the MVP, so a
+cart never mixes currencies. Anything else is `400` (`"Only USD is
+supported"`, case-insensitive).
+
 `GET /api/v1/products` accepts `page`, `pageSize`, `categoryId`, `status`
 (role-aware, see above), and `search` (case-insensitive, matches product
 name) query params. `409` for a duplicate `slug` or `sku`.

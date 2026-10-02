@@ -9,6 +9,24 @@ const decimalStringSchema = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, "Must be a decimal amount with up to 2 decimal places");
 
+/**
+ * The MVP sells in a single currency (multi-currency is out of scope -- see
+ * docs/requirements.md). Products and variants still carry a `currency`
+ * column, but only this value is accepted, so a cart can never mix
+ * currencies.
+ */
+export const STORE_CURRENCY = "USD";
+
+const currencySchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  // Explicit `: boolean` keeps the output type `string` (TS would otherwise
+  // infer a type predicate and narrow it to the literal "USD").
+  .refine((currency): boolean => currency === STORE_CURRENCY, {
+    message: `Only ${STORE_CURRENCY} is supported`,
+  });
+
 export const createProductImageSchema = z.object({
   url: z.string().url("Must be a valid URL"),
   altText: z.string().trim().max(300).optional(),
@@ -30,7 +48,7 @@ export const createProductSchema = z
     sku: z.string().trim().min(1, "SKU is required").max(64),
     price: decimalStringSchema,
     salePrice: decimalStringSchema.optional(),
-    currency: z.string().trim().length(3).toUpperCase().default("USD"),
+    currency: currencySchema.default(STORE_CURRENCY),
     status: productStatusSchema.default("DRAFT"),
     categoryId: z.string().uuid().optional(),
     images: z.array(createProductImageSchema).max(20).optional(),
@@ -51,7 +69,7 @@ export const updateProductSchema = z
     sku: z.string().trim().min(1, "SKU is required").max(64).optional(),
     price: decimalStringSchema.optional(),
     salePrice: decimalStringSchema.optional(),
-    currency: z.string().trim().length(3).toUpperCase().optional(),
+    currency: currencySchema.optional(),
     status: productStatusSchema.optional(),
     categoryId: z.string().uuid().nullable().optional(),
   })
@@ -76,7 +94,7 @@ export const createProductVariantSchema = z
     sku: z.string().trim().min(1, "SKU is required").max(64),
     price: decimalStringSchema,
     salePrice: decimalStringSchema.optional(),
-    currency: z.string().trim().length(3).toUpperCase().default("USD"),
+    currency: currencySchema.default(STORE_CURRENCY),
     attributes: productVariantAttributesSchema,
     status: productStatusSchema.default("ACTIVE"),
     /** Starting `quantityAvailable`; reserved always starts at 0. */
@@ -93,7 +111,7 @@ export const updateProductVariantSchema = z
     sku: z.string().trim().min(1, "SKU is required").max(64).optional(),
     price: decimalStringSchema.optional(),
     salePrice: decimalStringSchema.optional(),
-    currency: z.string().trim().length(3).toUpperCase().optional(),
+    currency: currencySchema.optional(),
     attributes: productVariantAttributesSchema.optional(),
     status: productStatusSchema.optional(),
   })

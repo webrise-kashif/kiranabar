@@ -1,3 +1,4 @@
+import { STORE_CURRENCY } from "@kiranabar/validation";
 import type { Cart as CartType, CartItem as CartItemType } from "@kiranabar/types";
 import type { Cart as PrismaCart, CartItem as PrismaCartItem } from "@prisma/client";
 import { Prisma } from "@prisma/client";
@@ -10,6 +11,9 @@ type CartItemWithProduct = PrismaCartItem & {
 
 type CartWithItems = PrismaCart & { items: CartItemWithProduct[] };
 
+// Every product and variant is priced in STORE_CURRENCY (enforced by the
+// shared schemas), so a cart -- and the order checkout makes from it -- is
+// always single-currency and can be summed directly.
 export function toCart(cart: CartWithItems): CartType {
   const items: CartItemType[] = cart.items.map((item) => {
     const product = toProduct(item.product);
@@ -51,9 +55,9 @@ export function toCart(cart: CartWithItems): CartType {
     .reduce((sum, item) => sum.plus(item.lineTotal), new Prisma.Decimal(0))
     .toFixed(2);
 
-  return { id: cart.id, items, subtotal, currency: items[0]?.product.currency ?? "USD" };
+  return { id: cart.id, items, subtotal, currency: STORE_CURRENCY };
 }
 
 export function emptyCart(): CartType {
-  return { id: null, items: [], subtotal: "0.00", currency: "USD" };
+  return { id: null, items: [], subtotal: "0.00", currency: STORE_CURRENCY };
 }
