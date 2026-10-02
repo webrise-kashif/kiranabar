@@ -367,4 +367,86 @@ describe("Cart (e2e)", () => {
       expect(cart.body.data.items).toHaveLength(2);
     });
   });
+
+  // The future React Native app has no cookie jar: like auth tokens, its
+  // guest-cart token travels in the JSON body (out) and a request header
+  // (back in), selected by X-Client-Platform: mobile.
+  describe("mobile guest cart (no cookies)", () => {
+    const email = `cart-spec-mobile-${RUN_ID}@example.com`;
+    const password = "correct horse battery staple";
+    let guestCartToken: string;
+
+    afterAll(async () => {
+      await prisma.user.deleteMany({ where: { email } });
+    });
+
+    it("returns the guest cart token in the body for a mobile client", async () => {
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/cart/items")
+        .set("X-Client-Platform", "mobile")
+        .send({ productId, quantity: 1 })
+        .expect(201);
+
+      expect(res.body.data.guestCartToken).toEqual(expect.any(String));
+      guestCartToken = res.body.data.guestCartToken as string;
+    });
+
+    it("identifies the same cart from the X-Guest-Cart-Token header on later requests", async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/cart/items/${productId}`)
+        .set("X-Client-Platform", "mobile")
+        .set("X-Guest-Cart-Token", guestCartToken)
+        .send({ quantity: 3 })
+        .expect(200);
+
+      const cart = await request(app.getHttpServer())
+        .get("/api/v1/cart")
+        .set("X-Client-Platform", "mobile")
+        .set("X-Guest-Cart-Token", guestCartToken)
+        .expect(200);
+
+      expect(cart.body.data.items).toEqual([
+        expect.objectContaining({ productId, variantId: null, quantity: 3 }),
+      ]);
+      expect(cart.body.data.guestCartToken).toBe(guestCartToken);
+    });
+
+    it("never puts the token in the body for a web client (it stays in the httpOnly cookie)", async () => {
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/cart/items")
+        .send({ productId, quantity: 1 })
+        .expect(201);
+
+      expect(res.body.data).not.toHaveProperty("guestCartToken");
+    });
+
+    it("merges the guest cart into the account on mobile register via X-Guest-Cart-Token", async () => {
+      const registered = await request(app.getHttpServer())
+        .post("/api/v1/auth/register")
+        .set("X-Client-Platform", "mobile")
+        .set("X-Guest-Cart-Token", guestCartToken)
+        .send({ email, password })
+        .expect(201);
+      const accessToken = registered.body.data.accessToken as string;
+
+      const cart = await request(app.getHttpServer())
+        .get("/api/v1/cart")
+        .set("X-Client-Platform", "mobile")
+        .set("Authorization", `Bearer ${accessToken}`)
+        .expect(200);
+      expect(cart.body.data.items).toEqual([
+        expect.objectContaining({ productId, variantId: null, quantity: 3 }),
+      ]);
+      // A signed-in cart belongs to the account, so there is no guest token.
+      expect(cart.body.data).not.toHaveProperty("guestCartToken");
+
+      // The guest cart was consumed by the merge.
+      const oldGuestCart = await request(app.getHttpServer())
+        .get("/api/v1/cart")
+        .set("X-Client-Platform", "mobile")
+        .set("X-Guest-Cart-Token", guestCartToken)
+        .expect(200);
+      expect(oldGuestCart.body.data.items).toHaveLength(0);
+    });
+  });
 });

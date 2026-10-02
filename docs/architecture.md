@@ -286,6 +286,9 @@ account until checkout," which drove every decision here:
   `Cart.userId` and `Cart.guestToken` are both nullable/unique columns;
   exactly one is set. A guest is identified by an opaque random token
   issued as a cookie (`guest_cart_token`, `apps/api/src/cart/guest-cart-cookie.util.ts`)
+  for web clients, or in the response body and sent back as the
+  `X-Guest-Cart-Token` header for mobile clients (no cookie jar) — the same
+  `X-Client-Platform` transport split auth uses,
   the first time they add an item — not before, so an anonymous page view
   never creates a database row. This reuses the same `OptionalJwtAuthGuard`
   - `@OptionalUser()` pattern as catalog browsing: every `/cart` route is
@@ -305,7 +308,8 @@ account until checkout," which drove every decision here:
   `docs/database.md`'s `Inventory.version` was designed for — nothing here
   reserves stock; that's checkout's job once it exists.
 - **A guest cart merges into the account on login/register.**
-  `AuthController` reads the `guest_cart_token` cookie (if present) after
+  `AuthController` reads the guest token (the `guest_cart_token` cookie, or
+  the `X-Guest-Cart-Token` header from a mobile client) after
   a successful login/register, calls `CartService.mergeGuestCartIntoUser`,
   and clears the cookie. Matching product lines have their quantities
   added together; the guest cart row is then deleted. This is why

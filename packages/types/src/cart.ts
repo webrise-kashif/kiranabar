@@ -40,4 +40,11 @@ export interface Cart {
   items: CartItem[];
   subtotal: string;
   currency: string;
+  /**
+   * Only for a guest on a mobile client (`X-Client-Platform: mobile`), which
+   * has no cookie jar: the token identifying this guest cart, to store and
+   * send back as the `X-Guest-Cart-Token` header. Web clients never get it
+   * here -- theirs stays in the httpOnly `guest_cart_token` cookie.
+   */
+  guestCartToken?: string;
 }
