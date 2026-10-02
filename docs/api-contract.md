@@ -22,6 +22,13 @@ https://<host>/api/v1/...
 - REST over HTTPS. JSON request and response bodies.
 - `GET` for reads, `POST` for creation, `PATCH` for partial updates, `PUT` reserved
   for full replacement (unused until a resource needs it), `DELETE` for removal.
+- In a `PATCH` body, an **omitted** field is left unchanged and an optional
+  field sent as **`null`** is cleared (e.g. `{ "salePrice": null }` removes a
+  product's sale price). Validation runs against the values the update will
+  actually produce, so `{ "price": "15.00", "salePrice": null }` is valid even
+  if the stored sale price was higher than 15.00. Supported today on products
+  (`description`, `salePrice`, `categoryId`), variants (`salePrice`), and
+  images (`altText`; `variantId: null` moves a photo to the general gallery).
 
 ## Response envelope
 

@@ -37,7 +37,11 @@ export const createProductImageSchema = z.object({
 });
 export type CreateProductImageInput = z.infer<typeof createProductImageSchema>;
 
-export const updateProductImageSchema = createProductImageSchema.partial();
+export const updateProductImageSchema = createProductImageSchema.partial().extend({
+  altText: z.string().trim().max(300).nullable().optional(),
+  /** `null` moves the photo back to the product's general gallery. */
+  variantId: z.string().uuid().nullable().optional(),
+});
 export type UpdateProductImageInput = z.infer<typeof updateProductImageSchema>;
 
 export const createProductSchema = z
@@ -65,10 +69,10 @@ export const updateProductSchema = z
   .object({
     name: z.string().trim().min(1, "Name is required").max(200).optional(),
     slug: slugSchema.optional(),
-    description: z.string().trim().max(5000).optional(),
+    description: z.string().trim().max(5000).nullable().optional(),
     sku: z.string().trim().min(1, "SKU is required").max(64).optional(),
     price: decimalStringSchema.optional(),
-    salePrice: decimalStringSchema.optional(),
+    salePrice: decimalStringSchema.nullable().optional(),
     currency: currencySchema.optional(),
     status: productStatusSchema.optional(),
     categoryId: z.string().uuid().nullable().optional(),
@@ -110,7 +114,7 @@ export const updateProductVariantSchema = z
   .object({
     sku: z.string().trim().min(1, "SKU is required").max(64).optional(),
     price: decimalStringSchema.optional(),
-    salePrice: decimalStringSchema.optional(),
+    salePrice: decimalStringSchema.nullable().optional(),
     currency: currencySchema.optional(),
     attributes: productVariantAttributesSchema.optional(),
     status: productStatusSchema.optional(),

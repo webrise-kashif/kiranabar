@@ -278,6 +278,28 @@ describe("ProductsService", () => {
 
       expect(result.salePrice).toBe("19.99");
     });
+
+    it("clears salePrice with null, validating the new price against no sale price at all", async () => {
+      // Stored sale price 19.99; the new price 15.00 is only valid because
+      // the same update removes the sale price -- null must not fall back
+      // to the stored value the way an omitted field does.
+      prisma.product.findUnique.mockResolvedValue({
+        ...DB_PRODUCT,
+        salePrice: new Prisma.Decimal("19.99"),
+      });
+      prisma.product.update.mockResolvedValue({
+        ...DB_PRODUCT,
+        price: new Prisma.Decimal("15.00"),
+        salePrice: null,
+      });
+
+      const result = await service.update("prod-1", { price: "15.00", salePrice: null });
+
+      expect(prisma.product.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { price: "15.00", salePrice: null } }),
+      );
+      expect(result.salePrice).toBeNull();
+    });
   });
 
   describe("archive", () => {
@@ -419,6 +441,26 @@ describe("ProductsService", () => {
         ).rejects.toThrow("salePrice must be less than price");
         expect(prisma.productVariant.update).not.toHaveBeenCalled();
       });
+
+      it("clears salePrice with null, validating the new price against no sale price at all", async () => {
+        prisma.productVariant.findUnique.mockResolvedValue({
+          productId: "prod-1",
+          price: new Prisma.Decimal("26.99"),
+          salePrice: new Prisma.Decimal("25.00"),
+          status: "ACTIVE",
+        });
+        prisma.productVariant.update.mockResolvedValue({
+          ...DB_VARIANT,
+          price: new Prisma.Decimal("20.00"),
+          salePrice: null,
+        });
+
+        await service.updateVariant("prod-1", "var-1", { price: "20.00", salePrice: null });
+
+        expect(prisma.productVariant.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { price: "20.00", salePrice: null } }),
+        );
+      });
     });
 
     describe("archiveVariant", () => {
@@ -505,6 +547,26 @@ describe("ProductsService", () => {
 
       expect(prisma.productImage.updateMany).toHaveBeenCalledWith({
         where: { productId: "prod-1", variantId: null, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    });
+
+    it("updateImage moving a primary photo back to the general gallery (variantId: null) demotes the gallery's primary, not the old variant's", async () => {
+      prisma.productImage.findUnique.mockResolvedValue({ productId: "prod-1", variantId: "var-1" });
+      prisma.productImage.update.mockResolvedValue({
+        id: "img-1",
+        productId: "prod-1",
+        variantId: null,
+        url: "https://cdn.example.com/a.jpg",
+        altText: null,
+        position: 0,
+        isPrimary: true,
+      });
+
+      await service.updateImage("prod-1", "img-1", { variantId: null, isPrimary: true });
+
+      expect(prisma.productImage.updateMany).toHaveBeenCalledWith({
+        where: { productId: "prod-1", variantId: null, isPrimary: true, NOT: { id: "img-1" } },
         data: { isPrimary: false },
       });
     });

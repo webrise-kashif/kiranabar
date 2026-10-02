@@ -7,6 +7,7 @@ import {
   productQuerySchema,
   productVariantAttributesSchema,
   STORE_CURRENCY,
+  updateProductImageSchema,
   updateProductSchema,
   updateProductVariantSchema,
 } from "./product";
@@ -199,5 +200,41 @@ describe("store currency (single currency for the MVP)", () => {
     ["updateProductVariantSchema", updateProductVariantSchema, {}],
   ] as const)("%s accepts the store currency case-insensitively", (_name, schema, base) => {
     expect(schema.parse({ ...base, currency: " usd " }).currency).toBe("USD");
+  });
+});
+
+describe("clearing optional fields on update (null = clear, omitted = leave unchanged)", () => {
+  it("updateProductSchema accepts null for salePrice and description", () => {
+    expect(updateProductSchema.parse({ salePrice: null, description: null })).toEqual({
+      salePrice: null,
+      description: null,
+    });
+  });
+
+  it("updateProductVariantSchema accepts null for salePrice", () => {
+    expect(updateProductVariantSchema.parse({ salePrice: null })).toEqual({ salePrice: null });
+  });
+
+  it("updateProductImageSchema accepts null for altText and variantId", () => {
+    expect(updateProductImageSchema.parse({ altText: null, variantId: null })).toEqual({
+      altText: null,
+      variantId: null,
+    });
+  });
+
+  it("allows lowering price while clearing salePrice in the same update", () => {
+    expect(updateProductSchema.parse({ price: "10.00", salePrice: null })).toEqual({
+      price: "10.00",
+      salePrice: null,
+    });
+  });
+
+  it("still rejects null on create, where there is nothing to clear", () => {
+    expect(createProductSchema.safeParse({ ...VALID_PRODUCT, salePrice: null }).success).toBe(
+      false,
+    );
+    expect(createProductSchema.safeParse({ ...VALID_PRODUCT, description: null }).success).toBe(
+      false,
+    );
   });
 });

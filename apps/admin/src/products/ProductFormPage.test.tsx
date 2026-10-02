@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -85,5 +85,37 @@ describe("ProductFormPage", () => {
     expect(await screen.findByDisplayValue("Classic Tee")).toBeInTheDocument();
     expect(screen.getByDisplayValue("TSHIRT-001")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Edit Classic Tee" })).toBeInTheDocument();
+  });
+
+  it("clears the sale price and description when their fields are emptied on edit", async () => {
+    const onSale = { ...PRODUCT, description: "Soft cotton", salePrice: "19.99" };
+    let patchBody: unknown;
+    mockFetchRoutes({
+      "GET /categories": () =>
+        jsonResponse({ data: { items: [], total: 0, page: 1, pageSize: 100 } }),
+      "GET /products/p1/inventory": () =>
+        jsonResponse({ data: { quantityAvailable: 10, quantityReserved: 0, version: 0 } }),
+      "GET /products/p1": () => jsonResponse({ data: onSale }),
+      "PATCH /products/p1": (init) => {
+        patchBody = JSON.parse(init?.body as string);
+        return jsonResponse({ data: PRODUCT });
+      },
+    });
+
+    renderAt("/products/p1");
+    const user = userEvent.setup();
+
+    // Scoped to the product form: the variants editor on the same page has
+    // its own "Sale price" field.
+    const saveButton = await screen.findByRole("button", { name: "Save changes" });
+    const productForm = within(saveButton.closest("form")!);
+    await user.clear(productForm.getByLabelText(/^Sale price/));
+    await user.clear(productForm.getByLabelText(/^Description/));
+    await user.click(saveButton);
+
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    // An emptied field must be sent as null ("clear it") -- omitting it
+    // would leave the stored value unchanged.
+    expect(patchBody).toMatchObject({ salePrice: null, description: null });
   });
 });

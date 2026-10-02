@@ -128,6 +128,24 @@ describe("Products (e2e)", () => {
         .send({ name: "Dup", slug: `${slug}-dup`, sku, price: "1.00" })
         .expect(409);
     });
+
+    it("clears salePrice and description with null, even while lowering price below the old sale price", async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/products/${productId}`)
+        .set("Cookie", adminCookies)
+        .send({ description: "Soft cotton" })
+        .expect(200);
+
+      // Old sale price is 24.99; lowering price to 19.99 is only valid
+      // because the sale price is being removed in the same update.
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/products/${productId}`)
+        .set("Cookie", adminCookies)
+        .send({ price: "19.99", salePrice: null, description: null })
+        .expect(200);
+
+      expect(res.body.data).toMatchObject({ price: "19.99", salePrice: null, description: null });
+    });
   });
 
   describe("visibility", () => {
@@ -221,6 +239,22 @@ describe("Products (e2e)", () => {
       );
       expect(primaryImages).toHaveLength(1);
       expect(primaryImages[0].id).toBe(secondImageId);
+    });
+
+    it("clears an image's alt text with null", async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/products/${productId}/images/${secondImageId}`)
+        .set("Cookie", adminCookies)
+        .send({ altText: "Front view" })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/products/${productId}/images/${secondImageId}`)
+        .set("Cookie", adminCookies)
+        .send({ altText: null })
+        .expect(200);
+
+      expect(res.body.data.altText).toBeNull();
     });
 
     it("rejects write access to images for a CUSTOMER", async () => {
@@ -346,6 +380,22 @@ describe("Products (e2e)", () => {
         .expect(200);
 
       expect(res.body.data.price).toBe("27.99");
+    });
+
+    it("clears a variant's salePrice with null, even while lowering price below it", async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/products/${productId}/variants/${variantId}`)
+        .set("Cookie", adminCookies)
+        .send({ salePrice: "25.00" })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/products/${productId}/variants/${variantId}`)
+        .set("Cookie", adminCookies)
+        .send({ price: "20.00", salePrice: null })
+        .expect(200);
+
+      expect(res.body.data).toMatchObject({ price: "20.00", salePrice: null });
     });
 
     it("ADMIN adjusts the variant's own stock, independent of the product's", async () => {
