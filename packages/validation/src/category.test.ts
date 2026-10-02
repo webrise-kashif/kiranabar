@@ -37,6 +37,25 @@ describe("updateCategorySchema", () => {
   it("allows a partial update", () => {
     expect(updateCategorySchema.parse({ status: "ACTIVE" })).toEqual({ status: "ACTIVE" });
   });
+
+  it("never injects create's default status into an update that doesn't mention it", () => {
+    // Otherwise every rename would silently reset an ACTIVE category to DRAFT.
+    expect(updateCategorySchema.parse({ name: "Renamed" })).toEqual({ name: "Renamed" });
+  });
+
+  it("accepts null to clear description and parentId (moving a category to the top level)", () => {
+    expect(updateCategorySchema.parse({ description: null, parentId: null })).toEqual({
+      description: null,
+      parentId: null,
+    });
+  });
+
+  it("still rejects null on create, where there is nothing to clear", () => {
+    const base = { name: "Apparel", slug: "apparel" };
+
+    expect(createCategorySchema.safeParse({ ...base, description: null }).success).toBe(false);
+    expect(createCategorySchema.safeParse({ ...base, parentId: null }).success).toBe(false);
+  });
 });
 
 describe("categoryQuerySchema", () => {

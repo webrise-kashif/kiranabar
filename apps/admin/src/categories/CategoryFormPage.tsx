@@ -105,9 +105,11 @@ export function CategoryFormPage() {
         const input = updateCategorySchema.parse({
           name: form.name,
           slug: form.slug,
-          description: orUndefined(form.description),
+          // An emptied optional field is sent as null (clear it); omitting it
+          // would leave the stored value unchanged.
+          description: orUndefined(form.description) ?? null,
           status: form.status,
-          parentId: orUndefined(form.parentId),
+          parentId: orUndefined(form.parentId) ?? null,
         });
         const updated = await updateCategory(id, input);
         setCategory(updated);

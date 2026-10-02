@@ -129,12 +129,49 @@ describe("Categories (e2e)", () => {
     expect(res.body.data.children.map((c: { slug: string }) => c.slug)).toContain(childSlug);
   });
 
+  it("renaming an ACTIVE category keeps it ACTIVE (an update never resets status)", async () => {
+    const child = await prisma.category.findUniqueOrThrow({ where: { slug: childSlug } });
+
+    const res = await request(app.getHttpServer())
+      .patch(`/api/v1/categories/${child.id}`)
+      .set("Cookie", adminCookies)
+      .send({ name: "Spec Child Renamed" })
+      .expect(200);
+
+    expect(res.body.data).toMatchObject({ name: "Spec Child Renamed", status: "ACTIVE" });
+  });
+
   it("rejects a category being set as its own parent", async () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/categories/${rootId}`)
       .set("Cookie", adminCookies)
       .send({ parentId: rootId })
       .expect(409);
+  });
+
+  it("clears description and parentId with null, moving the child back to the top level", async () => {
+    const child = await prisma.category.findUniqueOrThrow({ where: { slug: childSlug } });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/categories/${child.id}`)
+      .set("Cookie", adminCookies)
+      .send({ description: "Tops and tees" })
+      .expect(200);
+
+    const cleared = await request(app.getHttpServer())
+      .patch(`/api/v1/categories/${child.id}`)
+      .set("Cookie", adminCookies)
+      .send({ description: null, parentId: null })
+      .expect(200);
+
+    expect(cleared.body.data).toMatchObject({ description: null, parentId: null });
+
+    // Re-attach: the deletion tests below rely on the child referencing the root.
+    await request(app.getHttpServer())
+      .patch(`/api/v1/categories/${child.id}`)
+      .set("Cookie", adminCookies)
+      .send({ parentId: rootId })
+      .expect(200);
   });
 
   it("archiving (soft delete) sets status to ARCHIVED, not a hard delete", async () => {

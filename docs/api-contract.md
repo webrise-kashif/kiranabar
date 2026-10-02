@@ -27,8 +27,11 @@ https://<host>/api/v1/...
   product's sale price). Validation runs against the values the update will
   actually produce, so `{ "price": "15.00", "salePrice": null }` is valid even
   if the stored sale price was higher than 15.00. Supported today on products
-  (`description`, `salePrice`, `categoryId`), variants (`salePrice`), and
-  images (`altText`; `variantId: null` moves a photo to the general gallery).
+  (`description`, `salePrice`, `categoryId`), variants (`salePrice`),
+  images (`altText`; `variantId: null` moves a photo to the general gallery),
+  and categories (`description`; `parentId: null` moves a category to the top
+  level). A `PATCH` never applies a create-time default: omitting `status`
+  leaves it as it is.
 
 ## Response envelope
 
