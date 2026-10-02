@@ -334,9 +334,20 @@ visibility and concurrency".
 ### Cart
 
 No cart id in any URL — every route resolves "whose cart" from either the
-authenticated caller or a `guest_cart_token` cookie the backend sets on the
-first `POST /cart/items` a guest makes. See `docs/architecture.md`'s "Cart:
+authenticated caller or a guest cart token the backend issues on the first
+`POST /cart/items` a guest makes. See `docs/architecture.md`'s "Cart:
 identity, pricing, and merge on login" for the full design.
+
+The guest token's transport follows the same per-platform split as auth
+(`X-Client-Platform`):
+
+- **Web** (default): an httpOnly `guest_cart_token` cookie. It is never put
+  in a response body.
+- **Mobile** (`X-Client-Platform: mobile`, no cookie jar): every cart
+  response for a guest includes `"guestCartToken": "..."`; the app stores it
+  and sends it back as the `X-Guest-Cart-Token` request header on cart
+  routes and on `/auth/login` / `/auth/register` (to merge the guest cart).
+  A signed-in cart never carries `guestCartToken`.
 
 ```json
 // POST /api/v1/cart/items  (works with or without a session)
@@ -379,9 +390,10 @@ price, never a snapshot (only a future `Order` snapshots price; see
 with no `variantId`, the product's) current `quantityAvailable`; `404` if
 `variantId` doesn't belong to the product, or (from `PATCH`/`DELETE` on
 `:productId`, optionally with `?variantId=`) if that exact line isn't in
-the cart. Logging in or registering with a guest cart cookie present
-merges its items (`variantId` included) into the account's cart and clears
-the cookie — see `docs/architecture.md`.
+the cart. Logging in or registering with a guest cart token present
+(cookie, or `X-Guest-Cart-Token` on mobile) merges its items (`variantId`
+included) into the account's cart and clears the cookie — see
+`docs/architecture.md`.
 
 ### Order
 

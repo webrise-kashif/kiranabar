@@ -13,7 +13,7 @@ import type { PublicUser } from "@kiranabar/types";
 import type { Request, Response } from "express";
 import { CartService } from "../cart/cart.service";
 import { AppConfigService } from "../config/app-config.service";
-import { GUEST_CART_TOKEN_COOKIE } from "../cart/guest-cart-cookie.util";
+import { GUEST_CART_TOKEN_COOKIE, readGuestCartToken } from "../cart/guest-cart-cookie.util";
 import { AuthService, type AuthSession } from "./auth.service";
 import {
   ACCESS_TOKEN_COOKIE,
@@ -125,9 +125,13 @@ export class AuthController {
     return req.cookies?.[REFRESH_TOKEN_COOKIE] ?? dto.refreshToken;
   }
 
-  /** Folds a guest cart (if any) into the now-authenticated user's cart. See CartService. */
+  /**
+   * Folds a guest cart (if any) into the now-authenticated user's cart. See
+   * CartService. The guest token comes from the cookie (web) or the
+   * X-Guest-Cart-Token header (mobile).
+   */
   private async mergeGuestCart(req: Request, res: Response, userId: string): Promise<void> {
-    const guestToken = req.cookies?.[GUEST_CART_TOKEN_COOKIE] as string | undefined;
+    const guestToken = readGuestCartToken(req);
 
     if (!guestToken) {
       return;
