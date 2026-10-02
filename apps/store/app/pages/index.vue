@@ -47,91 +47,106 @@ function primaryImage(product: Product) {
 </script>
 
 <template>
-  <main>
-    <h1>Shop</h1>
+  <main class="mx-auto max-w-6xl px-4 py-8">
+    <h1 class="mb-6 text-2xl font-bold tracking-tight text-gray-900">Shop</h1>
 
-    <form role="search" class="filters" @submit.prevent="applySearch">
-      <label>
-        Search
-        <input v-model="searchDraft" type="search" placeholder="Search products" />
+    <div class="mb-8 flex flex-wrap items-end gap-4">
+      <form role="search" class="flex items-end gap-2" @submit.prevent="applySearch">
+        <label class="block text-sm font-medium text-gray-700">
+          Search
+          <input
+            v-model="searchDraft"
+            type="search"
+            placeholder="Search products"
+            class="mt-1 block w-64 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+          />
+        </label>
+        <button
+          type="submit"
+          class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+        >
+          Search
+        </button>
+      </form>
+
+      <label class="block text-sm font-medium text-gray-700">
+        Category
+        <select
+          :value="categoryId"
+          class="mt-1 block w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+          @change="selectCategory(($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">All categories</option>
+          <option
+            v-for="category in categories?.items ?? []"
+            :key="category.id"
+            :value="category.id"
+          >
+            {{ category.name }}
+          </option>
+        </select>
       </label>
-      <button type="submit">Search</button>
-    </form>
+    </div>
 
-    <label class="filters">
-      Category
-      <select
-        :value="categoryId"
-        @change="selectCategory(($event.target as HTMLSelectElement).value)"
+    <p v-if="error" role="alert" class="rounded-md bg-red-50 p-4 text-sm text-red-700">
+      Sorry, we couldn't load the catalog. Please try again.
+    </p>
+    <p v-else-if="data && data.items.length === 0" class="py-12 text-center text-gray-500">
+      No products found.
+    </p>
+
+    <div v-else class="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
+      <article
+        v-for="product in data?.items ?? []"
+        :key="product.id"
+        class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
       >
-        <option value="">All categories</option>
-        <option v-for="category in categories?.items ?? []" :key="category.id" :value="category.id">
-          {{ category.name }}
-        </option>
-      </select>
-    </label>
-
-    <p v-if="error" role="alert">Sorry, we couldn't load the catalog. Please try again.</p>
-    <p v-else-if="data && data.items.length === 0">No products found.</p>
-
-    <div v-else class="grid">
-      <article v-for="product in data?.items ?? []" :key="product.id" class="card">
         <img
           v-if="primaryImage(product)"
           :src="primaryImage(product)!.url"
           :alt="primaryImage(product)!.altText ?? product.name"
+          class="aspect-square w-full object-cover"
         />
-        <h2>{{ product.name }}</h2>
-        <p v-if="product.salePrice" class="price">
-          {{ formatMoney(product.salePrice, product.currency) }}
-          <s>{{ formatMoney(product.price, product.currency) }}</s>
-        </p>
-        <p v-else class="price">{{ formatMoney(product.price, product.currency) }}</p>
+        <div v-else class="aspect-square w-full bg-gray-100" aria-hidden="true" />
+        <div class="p-4">
+          <h2 class="text-sm font-medium text-gray-900">{{ product.name }}</h2>
+          <p v-if="product.salePrice" class="mt-1 text-sm font-semibold text-red-600">
+            {{ formatMoney(product.salePrice, product.currency) }}
+            <s class="ml-2 font-normal text-gray-500">{{
+              formatMoney(product.price, product.currency)
+            }}</s>
+          </p>
+          <p v-else class="mt-1 text-sm font-semibold text-gray-900">
+            {{ formatMoney(product.price, product.currency) }}
+          </p>
+        </div>
       </article>
     </div>
 
-    <nav v-if="!error && totalPages > 1" aria-label="Pagination" class="pagination">
-      <button type="button" aria-label="Previous page" :disabled="page <= 1" @click="page--">
+    <nav
+      v-if="!error && totalPages > 1"
+      aria-label="Pagination"
+      class="mt-8 flex items-center justify-center gap-4 text-sm text-gray-700"
+    >
+      <button
+        type="button"
+        aria-label="Previous page"
+        :disabled="page <= 1"
+        class="rounded-md border border-gray-300 bg-white px-3 py-2 font-medium shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        @click="page--"
+      >
         Previous
       </button>
       <span>Page {{ page }} of {{ totalPages }}</span>
-      <button type="button" aria-label="Next page" :disabled="page >= totalPages" @click="page++">
+      <button
+        type="button"
+        aria-label="Next page"
+        :disabled="page >= totalPages"
+        class="rounded-md border border-gray-300 bg-white px-3 py-2 font-medium shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        @click="page++"
+      >
         Next
       </button>
     </nav>
   </main>
 </template>
-
-<style scoped>
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: end;
-  margin-bottom: 1rem;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-  gap: 1rem;
-}
-
-.card img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-}
-
-.pagination {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  margin-top: 1.5rem;
-}
-
-.price s {
-  margin-left: 0.5rem;
-  color: #6b7280;
-}
-</style>
