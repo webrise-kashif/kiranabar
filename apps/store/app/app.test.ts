@@ -1,31 +1,27 @@
 import { mountSuspended } from "@nuxt/test-utils/runtime";
 import { flushPromises } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { clearNuxtData } from "#imports";
+import { jsonResponse, mockFetchRoutes } from "./test/mock-fetch";
 import App from "./app.vue";
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function mockFetchRoutes(routes: Record<string, () => Response>): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      for (const [path, handler] of Object.entries(routes)) {
-        if (url.includes(path)) return Promise.resolve(handler());
-      }
-      throw new Error(`Unhandled request in test: ${url}`);
-    }),
-  );
-}
+// Every App render now includes the catalog page (NuxtPage at "/"), so each
+// test needs its endpoints too -- otherwise the page would quietly fall into
+// its error state and hide a broken mock.
+const CATALOG_ROUTES = {
+  "/categories": () => jsonResponse({ data: { items: [], total: 0, page: 1, pageSize: 100 } }),
+  "/products": () => jsonResponse({ data: { items: [], total: 0, page: 1, pageSize: 12 } }),
+};
 
 describe("App", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    clearNuxtData();
+  });
+
   it("renders the web store heading, API status, and a login form when signed out", async () => {
     mockFetchRoutes({
+      ...CATALOG_ROUTES,
       "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
@@ -41,6 +37,7 @@ describe("App", () => {
 
   it("logs in and shows the current user", async () => {
     mockFetchRoutes({
+      ...CATALOG_ROUTES,
       "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
@@ -66,6 +63,7 @@ describe("App", () => {
 
   it("shows the current user immediately when a session already exists", async () => {
     mockFetchRoutes({
+      ...CATALOG_ROUTES,
       "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({
@@ -79,5 +77,20 @@ describe("App", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain("Signed in as existing@example.com");
+  });
+
+  it("shows the catalog page under the header at /", async () => {
+    mockFetchRoutes({
+      ...CATALOG_ROUTES,
+      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
+      "/auth/me": () =>
+        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
+    });
+
+    const wrapper = await mountSuspended(App, { route: "/" });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("Web Store");
+    expect(wrapper.findAll("h1").map((heading) => heading.text())).toContain("Shop");
   });
 });

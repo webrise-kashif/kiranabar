@@ -57,7 +57,7 @@ async function onLogout(): Promise<void> {
 </script>
 
 <template>
-  <main>
+  <header>
     <h1>Web Store</h1>
     <p v-if="health">API status: {{ health.status }}</p>
     <p v-if="healthError" role="alert">Could not reach API: {{ healthError }}</p>
@@ -86,5 +86,7 @@ async function onLogout(): Promise<void> {
       </button>
       <p v-if="authError" role="alert">{{ authError }}</p>
     </section>
-  </main>
+  </header>
+
+  <NuxtPage />
 </template>
