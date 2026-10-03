@@ -143,6 +143,14 @@ async function changeQuantity(item: CartItem, event: Event) {
           formatMoney(cart.subtotal, cart.currency)
         }}</span>
       </div>
+
+      <div class="flex justify-end border-t border-gray-200 p-4">
+        <NuxtLink
+          to="/checkout"
+          class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+          >Check out</NuxtLink
+        >
+      </div>
     </div>
   </main>
 </template>

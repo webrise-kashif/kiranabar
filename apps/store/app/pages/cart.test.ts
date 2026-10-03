@@ -265,4 +265,16 @@ describe("Cart page", () => {
       .map((row) => row.text().includes("No longer available"));
     expect(unavailable).toEqual([true, true, false]);
   });
+
+  it("offers to check out when the cart has items, and not when it's empty", async () => {
+    mockFetchRoutes({ "/cart": () => jsonResponse(cart([line()], "49.98")) });
+    const withItems = await mountCart();
+    expect(withItems.find("a[href='/checkout']").text()).toBe("Check out");
+
+    vi.unstubAllGlobals();
+    clearNuxtData();
+    mockFetchRoutes({ "/cart": () => jsonResponse(cart([], "0.00")) });
+    const empty = await mountCart();
+    expect(empty.find("a[href='/checkout']").exists()).toBe(false);
+  });
 });
