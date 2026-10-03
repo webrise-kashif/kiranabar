@@ -49,7 +49,7 @@ describe("ProductVariantsEditor", () => {
     expect(await screen.findByDisplayValue("3")).toBeInTheDocument(); // nested inventory editor
   });
 
-  it("fixes the currency to the store currency (USD) instead of an editable field", async () => {
+  it("states the store currency as a note and submits variants in it", async () => {
     let postBody: unknown;
     mockFetchRoutes({
       "POST /products/p1/variants": (init) => {
@@ -60,12 +60,8 @@ describe("ProductVariantsEditor", () => {
     render(<ProductVariantsEditor productId="p1" variants={[]} onChange={vi.fn()} />);
     const user = userEvent.setup();
 
-    const currency = screen.getByLabelText(/^Currency/);
-    // Select the current text and type over it, as an admin would. (On an
-    // editable field this replaces "USD"; a read-only one ignores it.)
-    await user.tripleClick(currency);
-    await user.keyboard("EUR");
-    expect(currency).toHaveValue("USD");
+    expect(screen.queryByLabelText(/^Currency/)).not.toBeInTheDocument();
+    expect(screen.getByText("Prices are in USD.")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/^SKU/), "TSHIRT-001-RED-M");
     await user.type(screen.getByLabelText(/^Price/), "26.99");

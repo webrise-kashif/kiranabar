@@ -211,18 +211,8 @@ export function ProductVariantsEditor({
               />
             </Field>
           </div>
-          <div className="w-24">
-            <Field label="Currency" htmlFor="variant-currency" required>
-              {/* Fixed to the single store currency -- see STORE_CURRENCY. */}
-              <input
-                id="variant-currency"
-                type="text"
-                value={STORE_CURRENCY}
-                readOnly
-                className={inputClass}
-              />
-            </Field>
-          </div>
+          {/* Fixed to the single store currency -- a note, not a field. */}
+          <p className="self-end pb-2 text-sm text-gray-500">Prices are in {STORE_CURRENCY}.</p>
           <div className="w-32">
             <Field label="Initial quantity" htmlFor="variant-initial-quantity">
               <input

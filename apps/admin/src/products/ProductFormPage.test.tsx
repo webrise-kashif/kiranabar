@@ -45,33 +45,10 @@ describe("ProductFormPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("creates a product from the form", async () => {
-    mockFetchRoutes({
-      "GET /categories": () =>
-        jsonResponse({ data: { items: [], total: 0, page: 1, pageSize: 100 } }),
-      "POST /products": () => jsonResponse({ data: PRODUCT }, 201),
-    });
-
-    renderAt("/products/new");
-    const user = userEvent.setup();
-
-    await user.type(screen.getByLabelText(/^Name/), "Classic Tee");
-    await user.type(screen.getByLabelText(/^Slug/), "classic-tee");
-    await user.type(screen.getByLabelText(/^SKU/), "TSHIRT-001");
-    await user.type(screen.getByLabelText(/^Price/), "24.99");
-    await user.click(screen.getByRole("button", { name: "Create product" }));
-
-    const fetchMock = vi.mocked(fetch);
-    await vi.waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some(([url]) => (url as string).toString().includes("/products")),
-      ).toBe(true);
-    });
-
-    expect(await screen.findByText('Product "Classic Tee" created.')).toBeInTheDocument();
-  });
-
-  it("fixes the currency to the store currency (USD) instead of an editable field", async () => {
+  // After creating, the admin lands on the new product's page -- where
+  // images, stock, and variants are managed -- rather than back on the list,
+  // where those options were easy to miss.
+  it("creates a product and opens its page to add images, stock, and variants", async () => {
     let postBody: unknown;
     mockFetchRoutes({
       "GET /categories": () =>
@@ -80,17 +57,13 @@ describe("ProductFormPage", () => {
         postBody = JSON.parse(init?.body as string);
         return jsonResponse({ data: PRODUCT }, 201);
       },
+      "GET /products/p1/inventory": () =>
+        jsonResponse({ data: { quantityAvailable: 10, quantityReserved: 0, version: 0 } }),
+      "GET /products/p1": () => jsonResponse({ data: PRODUCT }),
     });
 
     renderAt("/products/new");
     const user = userEvent.setup();
-
-    const currency = screen.getByLabelText(/^Currency/);
-    // Select the current text and type over it, as an admin would. (On an
-    // editable field this replaces "USD"; a read-only one ignores it.)
-    await user.tripleClick(currency);
-    await user.keyboard("EUR");
-    expect(currency).toHaveValue("USD");
 
     await user.type(screen.getByLabelText(/^Name/), "Classic Tee");
     await user.type(screen.getByLabelText(/^Slug/), "classic-tee");
@@ -98,8 +71,24 @@ describe("ProductFormPage", () => {
     await user.type(screen.getByLabelText(/^Price/), "24.99");
     await user.click(screen.getByRole("button", { name: "Create product" }));
 
-    expect(await screen.findByText('Product "Classic Tee" created.')).toBeInTheDocument();
-    expect(postBody).toMatchObject({ currency: "USD" });
+    expect(await screen.findByRole("heading", { name: "Edit Classic Tee" })).toBeInTheDocument();
+    expect(
+      screen.getByText('Product "Classic Tee" created. Add images, stock, and variants below.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Images" })).toBeInTheDocument();
+    expect(postBody).toMatchObject({ name: "Classic Tee", currency: "USD" });
+  });
+
+  it("states the store currency as a note instead of showing a currency field", async () => {
+    mockFetchRoutes({
+      "GET /categories": () =>
+        jsonResponse({ data: { items: [], total: 0, page: 1, pageSize: 100 } }),
+    });
+
+    renderAt("/products/new");
+
+    expect(screen.queryByLabelText(/^Currency/)).not.toBeInTheDocument();
+    expect(screen.getByText("Prices are in USD.")).toBeInTheDocument();
   });
 
   it("loads an existing product's fields for editing", async () => {
