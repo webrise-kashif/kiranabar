@@ -93,4 +93,18 @@ describe("App", () => {
     expect(wrapper.text()).toContain("Web Store");
     expect(wrapper.findAll("h1").map((heading) => heading.text())).toContain("Shop");
   });
+
+  it("links to the cart from the header", async () => {
+    mockFetchRoutes({
+      ...CATALOG_ROUTES,
+      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
+      "/auth/me": () =>
+        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
+    });
+
+    const wrapper = await mountSuspended(App, { route: "/" });
+    await flushPromises();
+
+    expect(wrapper.find("header a[href='/cart']").text()).toBe("Cart");
+  });
 });

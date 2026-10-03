@@ -30,12 +30,6 @@ const needsVariant = computed(() => variants.value.length > 0 && !selectedVarian
 /** What the shopper is about to buy: the chosen variant, else the product itself. */
 const priced = computed(() => selectedVariant.value ?? product.value);
 
-function describeVariant(attributes: Record<string, string>): string {
-  return Object.entries(attributes)
-    .map(([name, value]) => `${name.charAt(0).toUpperCase()}${name.slice(1)}: ${value}`)
-    .join(" · ");
-}
-
 // The chosen variant's own photos when it has any; otherwise the product's
 // general gallery (photos tagged to some variant are left out of it).
 const gallery = computed(() => {
