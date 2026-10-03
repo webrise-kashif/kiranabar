@@ -7,7 +7,7 @@ export function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-type RouteHandler = (url: URL, init?: RequestInit) => Response;
+type RouteHandler = (url: URL, init?: RequestInit) => Response | Promise<Response>;
 
 /**
  * Mocks global fetch for one test. Each key is a path suffix matched

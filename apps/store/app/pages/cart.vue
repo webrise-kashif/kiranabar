@@ -3,7 +3,11 @@ import type { CartItem } from "@kiranabar/types";
 
 const { getCart, updateItem, removeItem } = useCart();
 
-const { data: cart, error } = await useAsyncData("cart", getCart);
+// Browser-only (server: false): the cart is identified by the browser's
+// cookies (guest cart token or session), which a server-side render's fetch
+// doesn't carry -- it would get an empty cart, and the page would show that
+// on every full load. Lazy, so the page renders a loading state meanwhile.
+const { data: cart, error } = useAsyncData("cart", getCart, { server: false, lazy: true });
 
 const actionError = ref<string | null>(null);
 
@@ -61,7 +65,9 @@ async function changeQuantity(item: CartItem, event: Event) {
       Sorry, we couldn't load your cart. Please try again.
     </p>
 
-    <div v-else-if="cart && cart.items.length === 0" class="py-16 text-center">
+    <p v-else-if="!cart" class="py-16 text-center text-gray-500">Loading your cart…</p>
+
+    <div v-else-if="cart.items.length === 0" class="py-16 text-center">
       <p class="text-gray-500">Your cart is empty.</p>
       <NuxtLink
         to="/"
@@ -71,7 +77,7 @@ async function changeQuantity(item: CartItem, event: Event) {
       </NuxtLink>
     </div>
 
-    <div v-else-if="cart" class="rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div v-else class="rounded-lg border border-gray-200 bg-white shadow-sm">
       <ul class="divide-y divide-gray-200">
         <li
           v-for="item in cart.items"
@@ -136,6 +142,14 @@ async function changeQuantity(item: CartItem, event: Event) {
         <span data-subtotal class="text-lg font-semibold text-gray-900">{{
           formatMoney(cart.subtotal, cart.currency)
         }}</span>
+      </div>
+
+      <div class="flex justify-end border-t border-gray-200 p-4">
+        <NuxtLink
+          to="/checkout"
+          class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+          >Check out</NuxtLink
+        >
       </div>
     </div>
   </main>

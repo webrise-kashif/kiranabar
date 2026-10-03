@@ -71,6 +71,17 @@ describe("Cart page", () => {
     clearNuxtData();
   });
 
+  // The cart belongs to the browser (guest cookie or session), so it's
+  // fetched there, not during server rendering -- which shows this first.
+  it("shows a loading state while the cart is being fetched", async () => {
+    mockFetchRoutes({ "/cart": () => new Promise<Response>(() => {}) });
+
+    const wrapper = await mountSuspended(CartPage, { route: "/cart" });
+
+    expect(wrapper.text()).toContain("Loading your cart…");
+    expect(wrapper.text()).not.toContain("Your cart is empty.");
+  });
+
   it("lists each line with its product, variant, prices, and the subtotal", async () => {
     mockFetchRoutes({ "/cart": () => jsonResponse(cart([line(), HOODIE_RED_M], "104.98")) });
 
@@ -253,5 +264,17 @@ describe("Cart page", () => {
       .findAll("[data-cart-line]")
       .map((row) => row.text().includes("No longer available"));
     expect(unavailable).toEqual([true, true, false]);
+  });
+
+  it("offers to check out when the cart has items, and not when it's empty", async () => {
+    mockFetchRoutes({ "/cart": () => jsonResponse(cart([line()], "49.98")) });
+    const withItems = await mountCart();
+    expect(withItems.find("a[href='/checkout']").text()).toBe("Check out");
+
+    vi.unstubAllGlobals();
+    clearNuxtData();
+    mockFetchRoutes({ "/cart": () => jsonResponse(cart([], "0.00")) });
+    const empty = await mountCart();
+    expect(empty.find("a[href='/checkout']").exists()).toBe(false);
   });
 });
