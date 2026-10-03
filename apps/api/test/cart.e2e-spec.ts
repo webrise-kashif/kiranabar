@@ -18,6 +18,9 @@ describe("Cart (e2e)", () => {
   let adminCookies: string[];
 
   const RUN_ID = Date.now();
+  // For cleanup: only carts this run created. Test files run in parallel
+  // against one database, so a DB-wide delete would hit other suites.
+  const startedAt = new Date();
   const slug = `cart-spec-${RUN_ID}`;
   const sku = `CART-SPEC-${RUN_ID}`;
   let productId: string;
@@ -86,10 +89,13 @@ describe("Cart (e2e)", () => {
   });
 
   afterAll(async () => {
-    // Removes the empty guest carts left behind by this run (the user cart
-    // from the merge test below is already gone via that user's own
-    // afterAll, since Cart cascades on User deletion).
-    await prisma.cart.deleteMany({ where: { items: { none: {} } } });
+    // Removes the guest carts this run created (user carts go with their
+    // users' own afterAll, since Cart cascades on User deletion). Scoped to
+    // guest carts created since this suite started: a DB-wide "every empty
+    // cart" delete also hit carts other test files were mid-way through
+    // filling (a cart is briefly empty between creation and its first
+    // item), failing them with a cart_items foreign-key violation.
+    await prisma.cart.deleteMany({ where: { userId: null, createdAt: { gte: startedAt } } });
     await prisma.product.deleteMany({ where: { slug } });
     await app.close();
   });
