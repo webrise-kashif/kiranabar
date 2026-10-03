@@ -19,49 +19,28 @@ describe("App", () => {
     clearNuxtData();
   });
 
-  it("renders the web store heading, API status, and a login form when signed out", async () => {
+  // Signing in and creating an account live on /account (see
+  // pages/account.test.ts); the header only links there.
+  it("shows the heading, API status, and a Sign in link -- no inline form -- when signed out", async () => {
     mockFetchRoutes({
       ...CATALOG_ROUTES,
       "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
+      "/auth/refresh": () =>
+        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
     });
 
-    const wrapper = await mountSuspended(App);
+    const wrapper = await mountSuspended(App, { route: "/" });
     await flushPromises();
 
     expect(wrapper.text()).toContain("Web Store");
     expect(wrapper.text()).toContain("API status: ok");
-    expect(wrapper.find('input[type="email"]').exists()).toBe(true);
+    expect(wrapper.find("header a[href='/account']").text()).toBe("Sign in");
+    expect(wrapper.find("header input").exists()).toBe(false);
   });
 
-  it("logs in and shows the current user", async () => {
-    mockFetchRoutes({
-      ...CATALOG_ROUTES,
-      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
-      "/auth/me": () =>
-        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
-      "/auth/login": () =>
-        jsonResponse({
-          data: {
-            user: { id: "1", email: "user@example.com", role: "CUSTOMER", createdAt: "now" },
-          },
-        }),
-    });
-
-    const wrapper = await mountSuspended(App);
-    await flushPromises();
-
-    await wrapper.find('input[type="email"]').setValue("user@example.com");
-    await wrapper.find('input[type="password"]').setValue("password123");
-    await wrapper.find("form").trigger("submit");
-    await flushPromises();
-
-    expect(wrapper.text()).toContain("Signed in as user@example.com");
-    expect(wrapper.find('input[type="email"]').exists()).toBe(false);
-  });
-
-  it("shows the current user immediately when a session already exists", async () => {
+  it("links to the account instead when a session already exists", async () => {
     mockFetchRoutes({
       ...CATALOG_ROUTES,
       "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
@@ -73,10 +52,11 @@ describe("App", () => {
         }),
     });
 
-    const wrapper = await mountSuspended(App);
+    const wrapper = await mountSuspended(App, { route: "/" });
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Signed in as existing@example.com");
+    expect(wrapper.find("header a[href='/account']").text()).toBe("Account");
+    expect(wrapper.text()).not.toContain("Sign in");
   });
 
   it("shows the catalog page under the header at /", async () => {

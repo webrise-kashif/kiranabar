@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Order, PaginatedResult } from "@kiranabar/types";
 
+const route = useRoute();
 const { user, fetchCurrentUser } = useAuth();
 const { listOrders } = useOrders();
 
@@ -53,7 +54,11 @@ function itemCount(order: Order): string {
 
     <div v-else-if="!user" class="rounded-lg border border-gray-200 bg-white p-8 text-center">
       <p class="text-lg font-medium text-gray-900">Sign in to see your orders</p>
-      <p class="mt-2 text-sm text-gray-500">Use the form at the top of the page.</p>
+      <NuxtLink
+        :to="{ path: '/account', query: { redirect: route.path } }"
+        class="mt-4 inline-block rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+        >Sign in</NuxtLink
+      >
     </div>
 
     <p v-else-if="loadError" role="alert" class="rounded-md bg-red-50 p-4 text-sm text-red-700">
