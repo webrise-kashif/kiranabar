@@ -68,9 +68,10 @@ async function onLogout(): Promise<void> {
           </p>
         </div>
 
-        <NuxtLink to="/cart" class="ml-auto text-sm font-medium text-gray-700 hover:text-indigo-600"
-          >Cart</NuxtLink
-        >
+        <nav class="ml-auto flex items-center gap-4 text-sm font-medium text-gray-700">
+          <NuxtLink v-if="user" to="/orders" class="hover:text-indigo-600">My orders</NuxtLink>
+          <NuxtLink to="/cart" class="hover:text-indigo-600">Cart</NuxtLink>
+        </nav>
 
         <section v-if="user" class="flex items-center gap-3 text-sm text-gray-700">
           <p>Signed in as {{ user.email }} ({{ user.role }})</p>

@@ -4,8 +4,10 @@ import type { ShippingAddress } from "@kiranabar/types";
 
 const route = useRoute();
 const orderId = computed(() => String(route.params.id));
+// Arriving straight from checkout (see pages/checkout.vue).
+const justPlaced = computed(() => route.query.placed === "1");
 
-const { getOrder } = useOrders();
+const { getOrder, cancelOrder } = useOrders();
 
 // The order belongs to the signed-in session, so it's fetched in the browser
 // (server: false) -- see pages/cart.vue. A 404 (unknown, or another
@@ -28,6 +30,29 @@ const { data: order, error } = useAsyncData(
   { server: false, lazy: true },
 );
 
+const cancelling = ref(false);
+const cancelled = ref(false);
+const cancelError = ref<string | null>(null);
+
+/** Customers can cancel only while an order is still PLACED (the API enforces it). */
+async function cancel(id: string) {
+  if (!window.confirm("Cancel this order? This can't be undone.")) {
+    return;
+  }
+
+  cancelling.value = true;
+  cancelError.value = null;
+  try {
+    order.value = await cancelOrder(id);
+    cancelled.value = true;
+  } catch (err) {
+    // The API's message is written for shoppers.
+    cancelError.value = err instanceof Error ? err.message : "Couldn't cancel this order";
+  } finally {
+    cancelling.value = false;
+  }
+}
+
 /** The address as display lines, skipping empty optional ones. */
 function addressLines(address: ShippingAddress): string[] {
   return [
@@ -37,10 +62,6 @@ function addressLines(address: ShippingAddress): string[] {
     `${address.city}, ${address.state} ${address.postalCode}`,
     address.country,
   ].filter((part): part is string => Boolean(part));
-}
-
-function statusLabel(status: string): string {
-  return status.charAt(0) + status.slice(1).toLowerCase();
 }
 </script>
 
@@ -69,11 +90,37 @@ function statusLabel(status: string): string {
 
     <div v-else>
       <h1 class="text-2xl font-bold tracking-tight text-gray-900">
-        Thank you! Your order has been placed.
+        {{
+          justPlaced
+            ? "Thank you! Your order has been placed."
+            : `Order ${orderReference(order.id)}`
+        }}
       </h1>
       <p class="mt-2 text-sm text-gray-500">
-        Order {{ order.id }} · Status: {{ statusLabel(order.status) }}
+        <template v-if="justPlaced">Order {{ orderReference(order.id) }} · </template>
+        Placed {{ formatOrderDate(order.createdAt) }} · Status: {{ statusLabel(order.status) }}
       </p>
+
+      <p
+        v-if="cancelled"
+        role="status"
+        class="mt-4 rounded-md bg-green-50 p-3 text-sm text-green-800"
+      >
+        Your order has been cancelled.
+      </p>
+      <p v-if="cancelError" role="alert" class="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+        {{ cancelError }}
+      </p>
+      <button
+        v-if="order.status === 'PLACED'"
+        type="button"
+        data-cancel-order
+        :disabled="cancelling"
+        class="mt-4 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+        @click="cancel(order.id)"
+      >
+        {{ cancelling ? "Cancelling…" : "Cancel order" }}
+      </button>
 
       <section class="mt-8 rounded-lg border border-gray-200 bg-white p-6">
         <ul class="divide-y divide-gray-200">

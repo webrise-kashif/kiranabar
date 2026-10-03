@@ -87,7 +87,9 @@ async function submit() {
   placing.value = true;
   try {
     const order = await placeOrder({ shippingAddress: parsed.data });
-    await navigateTo(`/orders/${order.id}`);
+    // ?placed=1 tells the order page to thank the shopper; reached any other
+    // way (e.g. from order history), it's just the order's details.
+    await navigateTo({ path: `/orders/${order.id}`, query: { placed: "1" } });
   } catch (err) {
     // The API's message is written for shoppers (e.g. stock changed).
     placeError.value = err instanceof Error ? err.message : "Couldn't place your order";

@@ -193,6 +193,7 @@ describe("Checkout page", () => {
       });
       // Navigation lazy-loads the order page, so wait for it to land.
       await vi.waitFor(() => expect(useRouter().currentRoute.value.path).toBe("/orders/o1"));
+      expect(useRouter().currentRoute.value.query.placed).toBe("1");
     });
 
     it("shows the API's reason when the order is rejected, and stays on the page", async () => {

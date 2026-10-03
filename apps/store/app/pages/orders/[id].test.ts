@@ -49,8 +49,8 @@ const ORDER: Order = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
-async function mountOrder(id: string) {
-  const wrapper = await mountSuspended(OrderPage, { route: `/orders/${id}` });
+async function mountOrder(id: string, query = "") {
+  const wrapper = await mountSuspended(OrderPage, { route: `/orders/${id}${query}` });
   await flushPromises();
   return wrapper;
 }
@@ -64,7 +64,8 @@ describe("Order confirmation page", () => {
   it("confirms the order with its items, total, and shipping address", async () => {
     mockFetchRoutes({ [`/orders/${ORDER.id}`]: () => jsonResponse({ data: ORDER }) });
 
-    const wrapper = await mountOrder(ORDER.id);
+    // Arriving from checkout, which adds ?placed=1.
+    const wrapper = await mountOrder(ORDER.id, "?placed=1");
 
     expect(wrapper.find("h1").text()).toBe("Thank you! Your order has been placed.");
     expect(wrapper.text()).toContain("Status: Placed");
@@ -109,5 +110,97 @@ describe("Order confirmation page", () => {
 
     expect(wrapper.find("h1").text()).toBe("Sign in to view this order");
     expect(wrapper.find("[role=alert]").exists()).toBe(false);
+  });
+
+  it("is headed by the order reference when viewed later (e.g. from order history)", async () => {
+    mockFetchRoutes({ [`/orders/${ORDER.id}`]: () => jsonResponse({ data: ORDER }) });
+
+    const wrapper = await mountOrder(ORDER.id);
+
+    expect(wrapper.find("h1").text()).toBe("Order #00000001");
+    expect(wrapper.text()).not.toContain("Thank you");
+    expect(wrapper.text()).toContain("Status: Placed");
+  });
+
+  describe("cancelling", () => {
+    it("cancels a PLACED order after confirmation", async () => {
+      vi.stubGlobal(
+        "confirm",
+        vi.fn(() => true),
+      );
+      let method: string | undefined;
+      mockFetchRoutes({
+        [`/orders/${ORDER.id}`]: () => jsonResponse({ data: ORDER }),
+        [`/orders/${ORDER.id}/cancel`]: (_url, init) => {
+          method = init?.method;
+          return jsonResponse({ data: { ...ORDER, status: "CANCELLED" } });
+        },
+      });
+      const wrapper = await mountOrder(ORDER.id);
+
+      await wrapper.find("button[data-cancel-order]").trigger("click");
+      await flushPromises();
+
+      expect(method).toBe("PATCH");
+      expect(wrapper.text()).toContain("Status: Cancelled");
+      expect(wrapper.find("[role=status]").text()).toBe("Your order has been cancelled.");
+      expect(wrapper.find("button[data-cancel-order]").exists()).toBe(false);
+    });
+
+    it("does nothing if the shopper doesn't confirm", async () => {
+      vi.stubGlobal(
+        "confirm",
+        vi.fn(() => false),
+      );
+      const fetchMock = mockFetchRoutes({
+        [`/orders/${ORDER.id}`]: () => jsonResponse({ data: ORDER }),
+      });
+      const wrapper = await mountOrder(ORDER.id);
+
+      await wrapper.find("button[data-cancel-order]").trigger("click");
+      await flushPromises();
+
+      expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/cancel"))).toBe(false);
+      expect(wrapper.text()).toContain("Status: Placed");
+    });
+
+    it("isn't offered once an order is past PLACED", async () => {
+      mockFetchRoutes({
+        [`/orders/${ORDER.id}`]: () => jsonResponse({ data: { ...ORDER, status: "PAID" } }),
+      });
+
+      const wrapper = await mountOrder(ORDER.id);
+
+      expect(wrapper.find("button[data-cancel-order]").exists()).toBe(false);
+    });
+
+    it("shows the API's reason when cancelling is refused", async () => {
+      vi.stubGlobal(
+        "confirm",
+        vi.fn(() => true),
+      );
+      mockFetchRoutes({
+        [`/orders/${ORDER.id}`]: () => jsonResponse({ data: ORDER }),
+        [`/orders/${ORDER.id}/cancel`]: () =>
+          jsonResponse(
+            {
+              error: {
+                code: "FORBIDDEN",
+                message: "Only an order that hasn't been paid yet can be cancelled",
+              },
+            },
+            403,
+          ),
+      });
+      const wrapper = await mountOrder(ORDER.id);
+
+      await wrapper.find("button[data-cancel-order]").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find("[role=alert]").text()).toContain(
+        "Only an order that hasn't been paid yet can be cancelled",
+      );
+      expect(wrapper.text()).toContain("Status: Placed");
+    });
   });
 });
