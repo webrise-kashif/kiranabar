@@ -73,7 +73,11 @@ function addressLines(address: ShippingAddress): string[] {
 
     <div v-else-if="order === 'signed-out'" class="py-16 text-center">
       <h1 class="text-2xl font-bold text-gray-900">Sign in to view this order</h1>
-      <p class="mt-2 text-sm text-gray-500">Use the form at the top of the page.</p>
+      <NuxtLink
+        :to="{ path: '/account', query: { redirect: route.path } }"
+        class="mt-4 inline-block rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+        >Sign in</NuxtLink
+      >
     </div>
 
     <div v-else-if="order === null" class="py-16 text-center">

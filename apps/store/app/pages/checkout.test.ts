@@ -97,6 +97,8 @@ describe("Checkout page", () => {
 
     expect(wrapper.text()).toContain("Sign in to check out");
     expect(wrapper.find("form").exists()).toBe(false);
+    // Signs in on /account, then comes straight back here.
+    expect(wrapper.find("a[href='/account?redirect=/checkout']").text()).toBe("Sign in");
   });
 
   it("shows the order summary and the shipping address form when signed in", async () => {

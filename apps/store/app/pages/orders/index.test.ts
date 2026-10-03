@@ -86,6 +86,7 @@ describe("Order history page", () => {
     const wrapper = await mountOrders();
     expect(wrapper.text()).toContain("Sign in to see your orders");
     expect(wrapper.findAll("[data-order-row]")).toHaveLength(0);
+    expect(wrapper.find("a[href='/account?redirect=/orders']").text()).toBe("Sign in");
 
     // What the header's sign-in form does on success (see useAuth).
     useState<PublicUser | null>("auth-user").value = USER;

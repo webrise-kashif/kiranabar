@@ -109,6 +109,7 @@ describe("Order confirmation page", () => {
     const wrapper = await mountOrder(ORDER.id);
 
     expect(wrapper.find("h1").text()).toBe("Sign in to view this order");
+    expect(wrapper.find(`a[href='/account?redirect=/orders/${ORDER.id}']`).text()).toBe("Sign in");
     expect(wrapper.find("[role=alert]").exists()).toBe(false);
   });
 

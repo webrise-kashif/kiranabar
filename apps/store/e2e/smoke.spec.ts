@@ -109,3 +109,39 @@ test("an item added to the cart is still there after a full page reload", async 
   }
   expect(errors).toEqual([]);
 });
+
+test("a shopper signs in from a page that needs it, returns there, and logs out", async ({
+  page,
+}) => {
+  const errors = trackBrowserErrors(page);
+
+  // Checkout needs an account: its prompt sends you to /account and back.
+  await page.goto("/checkout");
+  await expectHydrated(page, errors);
+  await expect(page.getByText("Sign in to check out")).toBeVisible();
+  await page.getByRole("main").getByRole("link", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(
+    (url) => url.pathname === "/account" && url.searchParams.get("redirect") === "/checkout",
+  );
+
+  // The seeded customer -- nothing is created.
+  await page.getByLabel("Email").fill("customer@example.com");
+  await page.getByLabel("Password").fill("dev-password-123");
+  await page.getByRole("main").getByRole("button", { name: "Sign in" }).click();
+
+  // Back on checkout. Then a full reload: right after signing in the page
+  // knows the user from the login response, but after a reload only the
+  // session cookie can -- so this is what proves the cookie works.
+  // Compare the path exactly: a /\/checkout$/ pattern also matches
+  // /account?redirect=/checkout, i.e. before signing in has finished.
+  await expect(page).toHaveURL((url) => url.pathname === "/checkout");
+  await page.reload();
+  await expectHydrated(page, errors);
+  await expect(page.getByRole("banner").getByRole("link", { name: "Account" })).toBeVisible();
+  await expect(page.getByText("Sign in to check out")).toBeHidden();
+
+  await page.getByRole("banner").getByRole("link", { name: "Account" }).click();
+  await page.getByRole("button", { name: "Log out" }).click();
+  await expect(page.getByRole("banner").getByRole("link", { name: "Sign in" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
