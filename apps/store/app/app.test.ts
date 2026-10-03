@@ -1,7 +1,7 @@
 import { mountSuspended } from "@nuxt/test-utils/runtime";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearNuxtData } from "#imports";
+import { clearNuxtData, useState } from "#imports";
 import { jsonResponse, mockFetchRoutes } from "./test/mock-fetch";
 import App from "./app.vue";
 
@@ -106,5 +106,34 @@ describe("App", () => {
     await flushPromises();
 
     expect(wrapper.find("header a[href='/cart']").text()).toBe("Cart");
+  });
+
+  it("links to the shopper's orders from the header only when signed in", async () => {
+    mockFetchRoutes({
+      ...CATALOG_ROUTES,
+      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
+      "/auth/me": () =>
+        jsonResponse({
+          data: {
+            user: { id: "1", email: "jane@example.com", role: "CUSTOMER", createdAt: "now" },
+          },
+        }),
+    });
+    const signedIn = await mountSuspended(App, { route: "/" });
+    await flushPromises();
+    expect(signedIn.find("header a[href='/orders']").text()).toBe("My orders");
+
+    vi.unstubAllGlobals();
+    clearNuxtData();
+    useState("auth-user").value = null;
+    mockFetchRoutes({
+      ...CATALOG_ROUTES,
+      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
+      "/auth/me": () =>
+        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
+    });
+    const signedOut = await mountSuspended(App, { route: "/" });
+    await flushPromises();
+    expect(signedOut.find("header a[href='/orders']").exists()).toBe(false);
   });
 });
