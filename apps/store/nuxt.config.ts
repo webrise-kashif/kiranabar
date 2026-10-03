@@ -8,6 +8,14 @@ export default defineNuxtConfig({
   css: ["~/assets/css/main.css"],
   vite: {
     plugins: [tailwindcss()],
+    // The shared workspace packages compile to CommonJS. Vite serves linked
+    // (non-node_modules) packages to the browser as-is, and a browser can't
+    // import CommonJS -- client-side code crashed on load with "does not
+    // provide an export named 'createApiClient'". Pre-bundling converts
+    // them to ESM, as it already does for node_modules dependencies.
+    optimizeDeps: {
+      include: ["@kiranabar/api-client", "@kiranabar/types", "@kiranabar/validation"],
+    },
   },
   runtimeConfig: {
     public: {
