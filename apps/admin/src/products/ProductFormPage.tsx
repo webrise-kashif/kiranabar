@@ -5,7 +5,9 @@ import { useNavigate, useParams } from "react-router";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import { PageHeader } from "../components/PageHeader";
+import { Toast } from "../components/Toast";
 import { useCategoryOptions } from "../lib/use-category-options";
+import { useFlashMessage } from "../lib/use-flash-message";
 import { inputClass } from "../lib/ui";
 import { createProduct, fetchProduct, updateProduct } from "./api";
 import { ProductImagesEditor } from "./ProductImagesEditor";
@@ -59,6 +61,8 @@ function orUndefined(value: string): string | undefined {
 export function ProductFormPage() {
   const { id } = useParams<{ id: string }>();
   const isCreate = !id;
+  const flashMessage = useFlashMessage();
+  const [dismissedFlash, setDismissedFlash] = useState<string | null>(null);
   const navigate = useNavigate();
   const { options: categories } = useCategoryOptions();
 
@@ -115,7 +119,13 @@ export function ProductFormPage() {
           initialQuantity: form.initialQuantity,
         });
         const created = await createProduct(input);
-        await navigate("/products", { state: { message: `Product "${created.name}" created.` } });
+        // Straight to the new product's page: images, stock, and variants
+        // can only be added once it exists, and are managed there.
+        await navigate(`/products/${created.id}`, {
+          state: {
+            message: `Product "${created.name}" created. Add images, stock, and variants below.`,
+          },
+        });
       } else {
         const input = updateProductSchema.parse({
           name: form.name,
@@ -157,6 +167,9 @@ export function ProductFormPage() {
   return (
     <>
       <PageHeader title={isCreate ? "New product" : `Edit ${product?.name}`} />
+      {flashMessage && flashMessage !== dismissedFlash && (
+        <Toast message={flashMessage} onClose={() => setDismissedFlash(flashMessage)} />
+      )}
 
       <form
         onSubmit={(event) => void handleSubmit(event)}
@@ -194,27 +207,18 @@ export function ProductFormPage() {
               />
             </Field>
           </div>
-          <Field label="SKU" htmlFor="product-sku" required>
-            <input
-              id="product-sku"
-              type="text"
-              value={form.sku}
-              onChange={(event) => updateField("sku", event.target.value)}
-              required
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Currency" htmlFor="product-currency" required>
-            {/* The store sells in one currency (see STORE_CURRENCY), so this is
-                shown for clarity but isn't editable. */}
-            <input
-              id="product-currency"
-              type="text"
-              value={STORE_CURRENCY}
-              readOnly
-              className={inputClass}
-            />
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label="SKU" htmlFor="product-sku" required>
+              <input
+                id="product-sku"
+                type="text"
+                value={form.sku}
+                onChange={(event) => updateField("sku", event.target.value)}
+                required
+                className={inputClass}
+              />
+            </Field>
+          </div>
           <Field label="Price" htmlFor="product-price" required>
             <input
               id="product-price"
@@ -238,6 +242,11 @@ export function ProductFormPage() {
               className={inputClass}
             />
           </Field>
+          {/* The store sells in one currency (see STORE_CURRENCY) -- a note under
+              the prices, not a field, so nothing looks editable that isn't. */}
+          <p className="-mt-2 text-sm text-gray-500 sm:col-span-2">
+            Prices are in {STORE_CURRENCY}.
+          </p>
           <Field label="Status" htmlFor="product-status">
             <select
               id="product-status"
