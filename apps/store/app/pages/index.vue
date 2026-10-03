@@ -1,152 +1,131 @@
 <script setup lang="ts">
-import type { Product } from "@kiranabar/types";
-
 const { fetchProducts, fetchCategories } = useCatalog();
 
-const PAGE_SIZE = 12;
-
-const page = ref(1);
-const search = ref("");
-const searchDraft = ref("");
-const categoryId = ref("");
-
-const { data: categories } = await useAsyncData("catalog-categories", fetchCategories);
-
-// A reactive key (not a fixed key + `watch`): each filter combination is
-// its own cache entry, and a change refetches with this instance's current
-// filters. With a fixed key, Nuxt shares the first instance's handler for
-// later refreshes, so another instance's filters could be used instead.
-const { data, error } = await useAsyncData(
-  () => `catalog-products:${page.value}:${search.value}:${categoryId.value}`,
-  () =>
-    fetchProducts({
-      page: page.value,
-      pageSize: PAGE_SIZE,
-      search: search.value || undefined,
-      categoryId: categoryId.value || undefined,
-    }),
+// Public catalog data: server-rendered (no session involved), and each
+// section fails on its own so one bad request doesn't blank the page.
+const { data: categories } = await useAsyncData("landing-categories", fetchCategories);
+const { data: newArrivals, error: newArrivalsError } = await useAsyncData(
+  "landing-new-arrivals",
+  () => fetchProducts({ pageSize: 8 }),
 );
 
-const totalPages = computed(() =>
-  data.value ? Math.max(1, Math.ceil(data.value.total / data.value.pageSize)) : 1,
+const topCategories = computed(() =>
+  (categories.value?.items ?? []).filter((category) => category.parentId === null).slice(0, 6),
 );
 
-function selectCategory(id: string) {
-  categoryId.value = id;
-  page.value = 1;
-}
-
-function applySearch() {
-  search.value = searchDraft.value.trim();
-  page.value = 1;
-}
-
-function primaryImage(product: Product) {
-  return product.images.find((image) => image.isPrimary) ?? product.images[0] ?? null;
-}
+// Only what the store really does -- no delivery times or guarantees it
+// can't back up.
+const BENEFITS = [
+  {
+    title: "Track every order",
+    text: "See every order and its status — placed, paid, shipped, delivered — under My orders.",
+  },
+  {
+    title: "Cancel before it's paid",
+    text: "Changed your mind? Cancel an order yourself while it's still being placed.",
+  },
+  {
+    title: "Your cart follows you",
+    text: "Shop as a guest, then sign in at checkout — everything in your cart comes with you.",
+  },
+];
 </script>
 
 <template>
-  <main class="mx-auto max-w-6xl px-4 py-8">
-    <h1 class="mb-6 text-2xl font-bold tracking-tight text-gray-900">Shop</h1>
-
-    <div class="mb-8 flex flex-wrap items-end gap-4">
-      <form role="search" class="flex items-end gap-2" @submit.prevent="applySearch">
-        <label class="block text-sm font-medium text-gray-700">
-          Search
-          <input
-            v-model="searchDraft"
-            type="search"
-            placeholder="Search products"
-            class="mt-1 block w-64 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
-          />
-        </label>
-        <button
-          type="submit"
-          class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-        >
-          Search
-        </button>
-      </form>
-
-      <label class="block text-sm font-medium text-gray-700">
-        Category
-        <select
-          :value="categoryId"
-          class="mt-1 block w-48 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
-          @change="selectCategory(($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">All categories</option>
-          <option
-            v-for="category in categories?.items ?? []"
-            :key="category.id"
-            :value="category.id"
-          >
-            {{ category.name }}
-          </option>
-        </select>
-      </label>
-    </div>
-
-    <p v-if="error" role="alert" class="rounded-md bg-red-50 p-4 text-sm text-red-700">
-      Sorry, we couldn't load the catalog. Please try again.
-    </p>
-    <p v-else-if="data && data.items.length === 0" class="py-12 text-center text-gray-500">
-      No products found.
-    </p>
-
-    <div v-else class="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
-      <article
-        v-for="product in data?.items ?? []"
-        :key="product.id"
-        class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-      >
-        <NuxtLink :to="`/products/${product.slug}`" class="block">
-          <img
-            v-if="primaryImage(product)"
-            :src="primaryImage(product)!.url"
-            :alt="primaryImage(product)!.altText ?? product.name"
-            class="aspect-square w-full object-cover"
-          />
-          <div v-else class="aspect-square w-full bg-gray-100" aria-hidden="true" />
-          <div class="p-4">
-            <h2 class="text-sm font-medium text-gray-900">{{ product.name }}</h2>
-            <p class="mt-1">
-              <PriceTag
-                :price="product.price"
-                :sale-price="product.salePrice"
-                :currency="product.currency"
-              />
-            </p>
-          </div>
-        </NuxtLink>
-      </article>
-    </div>
-
-    <nav
-      v-if="!error && totalPages > 1"
-      aria-label="Pagination"
-      class="mt-8 flex items-center justify-center gap-4 text-sm text-gray-700"
+  <main>
+    <section
+      data-hero
+      class="bg-gradient-to-br from-indigo-700 via-indigo-600 to-purple-600 text-white"
     >
-      <button
-        type="button"
-        aria-label="Previous page"
-        :disabled="page <= 1"
-        class="rounded-md border border-gray-300 bg-white px-3 py-2 font-medium shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-        @click="page--"
-      >
-        Previous
-      </button>
-      <span>Page {{ page }} of {{ totalPages }}</span>
-      <button
-        type="button"
-        aria-label="Next page"
-        :disabled="page >= totalPages"
-        class="rounded-md border border-gray-300 bg-white px-3 py-2 font-medium shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-        @click="page++"
-      >
-        Next
-      </button>
-    </nav>
+      <div class="mx-auto max-w-6xl px-4 py-20 sm:py-28">
+        <p class="text-sm font-semibold tracking-widest text-indigo-200 uppercase">Kiranabar</p>
+        <h1 class="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
+          Everything you need, all in one place
+        </h1>
+        <p class="mt-4 max-w-xl text-lg text-indigo-100">
+          Browse the whole catalog, grab what's on sale, and check out in a few steps.
+        </p>
+        <NuxtLink
+          to="/products"
+          class="mt-8 inline-block rounded-md bg-white px-6 py-3 text-sm font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50"
+          >Shop all products</NuxtLink
+        >
+      </div>
+    </section>
+
+    <div class="mx-auto max-w-6xl space-y-16 px-4 py-16">
+      <section v-if="topCategories.length > 0" data-categories>
+        <h2 class="text-2xl font-bold tracking-tight text-gray-900">Shop by category</h2>
+        <div class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <NuxtLink
+            v-for="category in topCategories"
+            :key="category.id"
+            :to="`/products?category=${category.id}`"
+            data-category-tile
+            class="flex aspect-square items-center justify-center rounded-lg bg-gradient-to-br from-indigo-50 to-purple-100 p-4 text-center font-semibold text-indigo-900 shadow-sm transition-shadow hover:shadow-md"
+            >{{ category.name }}</NuxtLink
+          >
+        </div>
+      </section>
+
+      <section data-new-arrivals>
+        <div class="flex items-baseline justify-between">
+          <h2 class="text-2xl font-bold tracking-tight text-gray-900">New arrivals</h2>
+          <NuxtLink to="/products" class="text-sm font-medium text-indigo-600 hover:underline"
+            >View all</NuxtLink
+          >
+        </div>
+        <p
+          v-if="newArrivalsError"
+          role="alert"
+          class="mt-6 rounded-md bg-red-50 p-4 text-sm text-red-700"
+        >
+          Sorry, we couldn't load new arrivals. Please try again.
+        </p>
+        <div v-else class="mt-6 grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
+          <ProductCard
+            v-for="product in newArrivals?.items ?? []"
+            :key="product.id"
+            :product="product"
+            title-tag="h3"
+          />
+        </div>
+      </section>
+
+      <section class="grid items-center gap-8 rounded-2xl bg-white p-8 shadow-sm md:grid-cols-2">
+        <div>
+          <h2 class="text-2xl font-bold tracking-tight text-gray-900">About Kiranabar</h2>
+          <p class="mt-4 text-gray-600">
+            Kiranabar brings the neighbourhood store online: a curated catalog, honest prices, and a
+            checkout that takes minutes, not forms.
+          </p>
+          <NuxtLink
+            to="/products"
+            class="mt-6 inline-block text-sm font-semibold text-indigo-600 hover:underline"
+            >Start browsing →</NuxtLink
+          >
+        </div>
+        <div
+          class="hidden aspect-video rounded-xl bg-gradient-to-br from-purple-100 to-indigo-100 md:block"
+          aria-hidden="true"
+        />
+      </section>
+
+      <section data-benefits>
+        <h2 class="text-center text-2xl font-bold tracking-tight text-gray-900">
+          Why shop with us
+        </h2>
+        <div class="mt-8 grid gap-6 md:grid-cols-3">
+          <div
+            v-for="benefit in BENEFITS"
+            :key="benefit.title"
+            class="rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm"
+          >
+            <h3 class="font-semibold text-gray-900">{{ benefit.title }}</h3>
+            <p class="mt-2 text-sm text-gray-600">{{ benefit.text }}</p>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 </template>

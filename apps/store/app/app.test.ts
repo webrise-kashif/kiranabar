@@ -59,19 +59,46 @@ describe("App", () => {
     expect(wrapper.text()).not.toContain("Sign in");
   });
 
-  it("shows the catalog page under the header at /", async () => {
+  it("shows the landing page at /, with the catalog a click away", async () => {
     mockFetchRoutes({
       ...CATALOG_ROUTES,
       "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
+        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
+      "/auth/refresh": () =>
         jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
     });
 
     const wrapper = await mountSuspended(App, { route: "/" });
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Web Store");
-    expect(wrapper.findAll("h1").map((heading) => heading.text())).toContain("Shop");
+    expect(wrapper.findAll("h1").map((heading) => heading.text())).toContain(
+      "Everything you need, all in one place",
+    );
+    expect(wrapper.find("header a[href='/products']").text()).toBe("Shop");
+  });
+
+  it("ends every page with a footer linking to the shop and the account", async () => {
+    mockFetchRoutes({
+      ...CATALOG_ROUTES,
+      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
+      "/auth/me": () =>
+        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
+      "/auth/refresh": () =>
+        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
+    });
+
+    const wrapper = await mountSuspended(App, { route: "/" });
+    await flushPromises();
+
+    const footer = wrapper.find("footer");
+    expect(footer.findAll("a").map((link) => [link.text(), link.attributes("href")])).toEqual([
+      ["All products", "/products"],
+      ["Cart", "/cart"],
+      ["Account", "/account"],
+      ["My orders", "/orders"],
+    ]);
+    expect(footer.text()).toContain(`© ${new Date().getFullYear()} Kiranabar`);
   });
 
   it("links to the cart from the header", async () => {
