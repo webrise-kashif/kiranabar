@@ -23,7 +23,13 @@ import type {
 import { Prisma } from "@prisma/client";
 import { CategoriesService } from "../categories/categories.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { PRODUCT_INCLUDE, toProduct, toProductImage, toProductVariant } from "./product.mapper";
+import {
+  PRODUCT_INCLUDE,
+  PUBLIC_PRODUCT_INCLUDE,
+  toProduct,
+  toProductImage,
+  toProductVariant,
+} from "./product.mapper";
 
 const VARIANT_INCLUDE = { inventory: true, images: true } as const;
 
@@ -109,7 +115,7 @@ export class ProductsService {
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        include: PRODUCT_INCLUDE,
+        include: includeAllStatuses ? PRODUCT_INCLUDE : PUBLIC_PRODUCT_INCLUDE,
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -123,7 +129,7 @@ export class ProductsService {
   async findOne(idOrSlug: string, includeAllStatuses: boolean): Promise<Product> {
     const product = await this.prisma.product.findFirst({
       where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-      include: PRODUCT_INCLUDE,
+      include: includeAllStatuses ? PRODUCT_INCLUDE : PUBLIC_PRODUCT_INCLUDE,
     });
 
     if (!product || (!includeAllStatuses && product.status !== "ACTIVE")) {

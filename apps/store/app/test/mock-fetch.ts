@@ -7,7 +7,7 @@ export function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-type RouteHandler = (url: URL) => Response;
+type RouteHandler = (url: URL, init?: RequestInit) => Response;
 
 /**
  * Mocks global fetch for one test. Each key is a path suffix matched
@@ -19,10 +19,10 @@ type RouteHandler = (url: URL) => Response;
 export function mockFetchRoutes(routes: Record<string, RouteHandler>) {
   const entries = Object.entries(routes).sort(([a], [b]) => b.length - a.length);
 
-  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === "string" ? input : input.toString());
     for (const [path, handler] of entries) {
-      if (url.pathname.endsWith(path)) return Promise.resolve(handler(url));
+      if (url.pathname.endsWith(path)) return Promise.resolve(handler(url, init));
     }
     throw new Error(`Unhandled request in test: ${url.toString()}`);
   });

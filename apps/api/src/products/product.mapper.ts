@@ -15,6 +15,16 @@ export const PRODUCT_INCLUDE = {
   variants: { include: { inventory: true, images: true } },
 } as const;
 
+/**
+ * For a non-staff caller: the same shape, but only ACTIVE variants -- a
+ * DRAFT/ARCHIVED variant is as hidden from the public as a DRAFT/ARCHIVED
+ * product (see ProductsService.findOne/findMany).
+ */
+export const PUBLIC_PRODUCT_INCLUDE = {
+  ...PRODUCT_INCLUDE,
+  variants: { where: { status: "ACTIVE" }, include: { inventory: true, images: true } },
+} as const;
+
 type ProductWithRelations = PrismaProduct & {
   category: Pick<Category, "id" | "name" | "slug"> | null;
   images: PrismaProductImage[];
