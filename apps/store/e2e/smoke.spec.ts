@@ -78,12 +78,24 @@ async function expectHydrated(page: Page, errors: string[]) {
   }
 }
 
-test("the catalog loads in the browser, hydrates, and lists products", async ({ page }) => {
+test("the landing page and the catalog load in the browser, hydrate, and list products", async ({
+  page,
+}) => {
   const errors = trackBrowserErrors(page);
 
+  // Landing page: the newest products include the one just created.
   await page.goto("/");
-
   await expectHydrated(page, errors);
+  await expect(
+    page.getByRole("heading", { name: "Everything you need, all in one place" }),
+  ).toBeVisible();
+  await expect(
+    page.locator("[data-new-arrivals]").getByRole("heading", { name: PRODUCT.name }),
+  ).toBeVisible();
+
+  // The catalog, via the header (client-side navigation).
+  await page.getByRole("banner").getByRole("link", { name: "Shop" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/products");
   await expect(page.getByRole("heading", { name: PRODUCT.name })).toBeVisible();
   expect(errors).toEqual([]);
 });

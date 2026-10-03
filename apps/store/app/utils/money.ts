@@ -6,3 +6,8 @@
 export function formatMoney(amount: string, currency: string): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(amount));
 }
+
+/** "25.00" -> "20.00" is 20 (percent off), rounded; display only. */
+export function discountPercent(price: string, salePrice: string): number {
+  return Math.round((1 - Number(salePrice) / Number(price)) * 100);
+}
