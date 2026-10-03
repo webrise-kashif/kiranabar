@@ -82,3 +82,48 @@ jobs:
       # dependencies before running its tests directly (outside Turborepo).
       - run: pnpm exec turbo run build --filter="@kiranabar/api^..."
       - run: pnpm --filter @kiranabar/api test:e2e
+
+  browser-smoke:
+    name: Store browser smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kiranabar
+          POSTGRES_PASSWORD: kiranabar
+          POSTGRES_DB: kiranabar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kiranabar"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @kiranabar/api prisma:generate
+      - run: pnpm --filter @kiranabar/api exec prisma migrate deploy
+      # The smoke tests sign in as the seeded admin to create their own product.
+      - run: pnpm --filter @kiranabar/api prisma:seed
+      # The API (run from dist/) and the workspace packages both apps use.
+      - run: pnpm exec turbo run build --filter="@kiranabar/api..." --filter="@kiranabar/store^..."
+      # Playwright starts the API and the store's dev server itself (see
+      # apps/store/playwright.config.ts) and drives the runner's Google Chrome.
+      - run: pnpm --filter @kiranabar/store test:browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            apps/store/playwright-report/
+            apps/store/test-results/
+          retention-days: 7

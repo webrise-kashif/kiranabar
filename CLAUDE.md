@@ -146,12 +146,23 @@ Vitest everywhere, plus the library that fits each surface:
 - **CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every
   pull request: format check, lint, typecheck, unit tests, and build in one
   job; API e2e tests against a PostgreSQL service container (migrated and
-  seeded) in another. Both must be green before merging.
+  seeded) in another; the store's browser smoke tests in a third. All must be
+  green before merging.
 - **`apps/admin`**: Vitest + `@testing-library/react` + `jsdom`. Query by role/text,
   not by test id, unless there's no accessible alternative.
 - **`apps/store`**: Vitest with `@nuxt/test-utils`'s `nuxt` environment (needed for
   Nuxt auto-imports like `ref`/`useRuntimeConfig` inside components) and
   `mountSuspended` from `@nuxt/test-utils/runtime`.
+  - `pnpm --filter @kiranabar/store test:browser` — **Playwright smoke tests in a
+    real browser** (`apps/store/e2e/`). Everything else runs in Node, and some
+    bugs only exist in a browser: the client bundle crashing on load (Vite
+    serving CommonJS packages untransformed) and session data fetched during
+    server rendering (no browser cookies there). They drive the installed
+    Google Chrome, start the API and the store's dev server if they aren't
+    running (needs a built API and a migrated, seeded database), and create
+    and delete their own test data. When a store change could behave
+    differently in a browser — hydration, cookies, client-only data — extend
+    these, and prove a new smoke test fails against the bug it guards.
 - New business logic (once implemented) needs tests before it's considered done —
   don't add product/cart/checkout/order code without corresponding tests.
 
