@@ -65,12 +65,13 @@ function trackBrowserErrors(page: Page): string[] {
 }
 
 /**
- * The header's API status line is rendered client-side only, so it proves
- * hydration. On failure, reports the browser errors seen -- usually the why.
+ * The app sets [data-hydrated] once its client side has mounted (app.vue), so
+ * it proves hydration -- a client bundle that fails to load never sets it.
+ * On failure, reports the browser errors seen -- usually the why.
  */
 async function expectHydrated(page: Page, errors: string[]) {
   try {
-    await expect(page.getByText("API status: ok")).toBeVisible();
+    await expect(page.locator("[data-hydrated]")).toBeAttached();
   } catch (error) {
     throw new Error(`The page didn't hydrate. Browser errors:\n${errors.join("\n") || "(none)"}`, {
       cause: error,

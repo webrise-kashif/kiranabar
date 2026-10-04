@@ -21,10 +21,9 @@ describe("App", () => {
 
   // Signing in and creating an account live on /account (see
   // pages/account.test.ts); the header only links there.
-  it("shows the heading, API status, and a Sign in link -- no inline form -- when signed out", async () => {
+  it("brands the header with the Kiranabar logo linking home, and a Sign in link", async () => {
     mockFetchRoutes({
       ...CATALOG_ROUTES,
-      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
       "/auth/refresh": () =>
@@ -34,16 +33,35 @@ describe("App", () => {
     const wrapper = await mountSuspended(App, { route: "/" });
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Web Store");
-    expect(wrapper.text()).toContain("API status: ok");
+    const logo = wrapper.find("header a[href='/'] img");
+    expect(logo.attributes()).toMatchObject({ src: "/kiranabar.svg", alt: "Kiranabar" });
+    // The old placeholder title and API status line are gone.
+    expect(wrapper.find("header").text()).not.toContain("Web Store");
+    expect(wrapper.find("header").text()).not.toContain("API status");
     expect(wrapper.find("header a[href='/account']").text()).toBe("Sign in");
     expect(wrapper.find("header input").exists()).toBe(false);
+  });
+
+  // The browser smoke tests wait for this to know the client app has mounted
+  // (see apps/store/e2e) -- it replaced the old "API status" line as that signal.
+  it("marks the app as hydrated once it has mounted in the browser", async () => {
+    mockFetchRoutes({
+      ...CATALOG_ROUTES,
+      "/auth/me": () =>
+        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
+      "/auth/refresh": () =>
+        jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
+    });
+
+    const wrapper = await mountSuspended(App, { route: "/" });
+    await flushPromises();
+
+    expect(wrapper.find("[data-hydrated]").exists()).toBe(true);
   });
 
   it("links to the account instead when a session already exists", async () => {
     mockFetchRoutes({
       ...CATALOG_ROUTES,
-      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({
           data: {
@@ -62,7 +80,6 @@ describe("App", () => {
   it("shows the landing page at /, with the catalog a click away", async () => {
     mockFetchRoutes({
       ...CATALOG_ROUTES,
-      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
       "/auth/refresh": () =>
@@ -81,7 +98,6 @@ describe("App", () => {
   it("ends every page with a footer linking to the shop and the account", async () => {
     mockFetchRoutes({
       ...CATALOG_ROUTES,
-      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
       "/auth/refresh": () =>
@@ -104,7 +120,6 @@ describe("App", () => {
   it("links to the cart from the header", async () => {
     mockFetchRoutes({
       ...CATALOG_ROUTES,
-      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
     });
@@ -118,7 +133,6 @@ describe("App", () => {
   it("links to the shopper's orders from the header only when signed in", async () => {
     mockFetchRoutes({
       ...CATALOG_ROUTES,
-      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({
           data: {
@@ -135,7 +149,6 @@ describe("App", () => {
     useState("auth-user").value = null;
     mockFetchRoutes({
       ...CATALOG_ROUTES,
-      "/health": () => jsonResponse({ data: { status: "ok", timestamp: "now" } }),
       "/auth/me": () =>
         jsonResponse({ error: { code: "UNAUTHORIZED", message: "No session" } }, 401),
     });
