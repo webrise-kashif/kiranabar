@@ -38,8 +38,7 @@ const BENEFITS = [
       class="bg-gradient-to-br from-indigo-700 via-indigo-600 to-purple-600 text-white"
     >
       <div class="mx-auto max-w-6xl px-4 py-20 sm:py-28">
-        <p class="text-sm font-semibold tracking-widest text-indigo-200 uppercase">Kiranabar</p>
-        <h1 class="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
+        <h1 class="max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
           Everything you need, all in one place
         </h1>
         <p class="mt-4 max-w-xl text-lg text-indigo-100">
