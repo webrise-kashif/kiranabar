@@ -69,6 +69,8 @@ describe("Landing page", () => {
     const hero = wrapper.find("[data-hero]");
     expect(hero.find("h1").text()).toBe("Everything you need, all in one place");
     expect(hero.find("a[href='/products']").text()).toBe("Shop all products");
+    // The header logo already says Kiranabar -- no repeated label in the hero.
+    expect(hero.text()).not.toMatch(/kiranabar/i);
   });
 
   it("shows a tile per top-level category, each opening the filtered catalog", async () => {
