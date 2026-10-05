@@ -19,7 +19,13 @@ onMounted(async () => {
     <header class="border-b border-gray-200 bg-white">
       <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
         <NuxtLink to="/" class="shrink-0">
-          <img src="/kiranabar.svg" alt="Kiranabar" width="200" height="40" class="h-8 w-auto" />
+          <img
+            src="/kiranabar.svg"
+            alt="Kiranabar"
+            width="200"
+            height="40"
+            class="h-auto w-[120px] max-w-full"
+          />
         </NuxtLink>
 
         <nav class="ml-auto flex items-center gap-4 text-sm font-medium text-gray-700">
